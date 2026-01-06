@@ -97,17 +97,16 @@ const InvoicePage: React.FC = () => {
   const handleSave = () => {
     const name = ledgerName.trim();
     
-    // 1. Check Name First
+    // 1. Validate Customer Name
     if (!name) {
-      alert("⚠️ ENTER CUSTOMER NAME\nPlease enter a name for the party.");
+      alert("⚠️ CUSTOMER NAME MISSING\nPlease enter a name before saving.");
       const input = document.getElementById('customer-name-input');
       input?.focus();
       input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
-    // 2. Comprehensive Row Check
-    // We check every row. If a row is partially filled, we force the user to complete it.
+    // 2. Row-by-Row Validation (The "Incomplete Entry" Fix)
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const p = item.particulars.trim();
@@ -117,26 +116,26 @@ const InvoicePage: React.FC = () => {
       const q = parseFloat(qVal) || 0;
       const r = parseFloat(rVal) || 0;
 
-      // Logic: If any field in the row is filled, the whole row must be valid.
-      const isDirty = p !== '' || qVal !== '' || rVal !== '' || q !== 0 || r !== 0;
+      // If anything is typed in the row, the whole row must be finished
+      const isPartiallyFilled = p !== '' || qVal !== '' || rVal !== '' || q !== 0 || r !== 0;
 
-      if (isDirty) {
+      if (isPartiallyFilled) {
         if (p === '') {
-          alert(`⚠️ ROW #${i + 1} MISSING PARTICULARS\nPlease enter a description.`);
+          alert(`⚠️ DESCRIPTION MISSING (Row ${i + 1})`);
           const el = document.getElementById(`particulars-${item.id}`);
           el?.focus();
           el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
         if (qVal === '' || q === 0) {
-          alert(`⚠️ ROW #${i + 1} MISSING QUANTITY\nPlease enter a valid Qty.`);
+          alert(`⚠️ QUANTITY MISSING (Row ${i + 1})`);
           const el = document.getElementById(`qty-${item.id}`);
           el?.focus();
           el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
         if (rVal === '' || r === 0) {
-          alert(`⚠️ ROW #${i + 1} MISSING RATE\nPlease enter a valid Rate.`);
+          alert(`⚠️ RATE MISSING (Row ${i + 1})`);
           const el = document.getElementById(`rate-${item.id}`);
           el?.focus();
           el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -145,11 +144,11 @@ const InvoicePage: React.FC = () => {
       }
     }
 
-    // Filter out completely empty rows
+    // Only keep rows that are fully complete
     const validItems = items.filter(i => i.particulars.trim() !== '' && (parseFloat(String(i.qty)) > 0) && (parseFloat(String(i.rate)) > 0));
     
     if (!validItems.length) {
-      alert("⚠️ NO ITEMS\nAdd at least one full row (Description, Qty, Rate).");
+      alert("⚠️ NO COMPLETED ROWS\nPlease add at least one full item.");
       return;
     }
 
@@ -175,6 +174,7 @@ const InvoicePage: React.FC = () => {
         navigate('/reports');
       } else {
         alert("✅ CHALLAN SAVED!");
+        // Clear for next entry
         setLedgerName('');
         setItems([{ id: DB.generateId(), particulars: '', qty: '', rate: '', amount: 0 }]);
         setDate(new Date().toISOString().split('T')[0]);
@@ -198,8 +198,8 @@ const InvoicePage: React.FC = () => {
   return (
     <div className="bg-white border-2 border-black p-3 md:p-8 invoice-font w-full mx-auto pb-[60vh] text-black relative">
       
-      {/* IMPROVED STICKY HEADER */}
-      <div className="sticky top-0 bg-white/95 backdrop-blur-md z-[150] border-b-2 border-black pb-2 mb-6 flex justify-between items-start pt-2 px-1">
+      {/* STICKY HEADER - Always visible while scrolling */}
+      <div className="sticky top-0 bg-white/95 backdrop-blur-md z-[150] border-b-2 border-black pb-2 mb-6 flex justify-between items-start pt-2 px-1 sticky-header">
         <div className="flex flex-col">
           <h1 className="text-xl font-black uppercase italic tracking-tighter text-indigo-700 leading-none">Challan</h1>
           <div className="flex items-center gap-1 mt-1">
@@ -219,7 +219,7 @@ const InvoicePage: React.FC = () => {
               #{String(serialNo).padStart(2, '0')}
             </div>
           </div>
-          {/* THE TICK BUTTON - High visibility and reliability */}
+          {/* THE TICK BUTTON - High visibility and immediate save */}
           <button 
             type="button"
             onClick={handleSave}
@@ -233,7 +233,7 @@ const InvoicePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Customer Input */}
+      {/* Party Input */}
       <div className="mb-8">
         <div className="inline-block bg-black px-2 py-0.5 mb-1">
           <label className="text-[8px] font-black uppercase text-white tracking-widest">Party Name</label>
@@ -251,7 +251,7 @@ const InvoicePage: React.FC = () => {
           {showSuggestions && suggestions.length > 0 && (
             <div className="absolute z-[200] w-full bg-white border-2 border-black mt-1 shadow-2xl max-h-48 overflow-y-auto">
               {suggestions.map(s => (
-                <div key={s.id} onClick={() => { setLedgerName(s.name); setShowSuggestions(false); }} className="p-4 border-b last:border-0 font-black uppercase hover:bg-black hover:text-white cursor-pointer text-black">
+                <div key={s.id} onClick={() => { setLedgerName(s.name); setShowSuggestions(false); }} className="p-4 border-b last:border-0 font-black uppercase hover:bg-black hover:text-white cursor-pointer text-black transition-colors">
                   {s.name}
                 </div>
               ))}
@@ -260,7 +260,7 @@ const InvoicePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Table Headers */}
+      {/* Column Titles */}
       <div className="grid grid-cols-12 gap-1 text-[8px] font-black uppercase text-gray-400 mb-3 px-1">
         <div className="col-span-5">Particulars</div>
         <div className="col-span-2 text-center">Qty</div>
@@ -268,7 +268,7 @@ const InvoicePage: React.FC = () => {
         <div className="col-span-3 text-right">Amount</div>
       </div>
 
-      {/* Items List */}
+      {/* Row Items */}
       <div className="space-y-8">
         {items.map((item, idx) => (
           <div key={item.id} className="grid grid-cols-12 gap-2 items-start border-b border-gray-100 pb-6 relative group">
@@ -282,7 +282,7 @@ const InvoicePage: React.FC = () => {
                   e.target.style.height = 'auto';
                   e.target.style.height = e.target.scrollHeight + 'px';
                 }} 
-                className="w-full font-bold uppercase text-[13px] outline-none bg-transparent resize-none leading-tight text-black border-b-2 border-black/10 focus:border-black transition-colors" 
+                className="w-full font-bold uppercase text-[13px] outline-none bg-transparent resize-none leading-tight text-black border-b-2 border-black/10 focus:border-black transition-all" 
                 placeholder="DESCRIPTION..."
               />
             </div>
@@ -293,7 +293,7 @@ const InvoicePage: React.FC = () => {
                 inputMode="decimal"
                 value={item.qty} 
                 onChange={e => handleItemChange(item.id, 'qty', e.target.value)} 
-                className="w-full font-black text-[15px] py-1 text-center bg-transparent border-b-2 border-black focus:border-indigo-600 text-black outline-none" 
+                className="w-full font-black text-[15px] py-1 text-center bg-transparent border-b-2 border-black focus:border-indigo-600 text-black outline-none transition-all" 
                 placeholder="0"
               />
             </div>
@@ -304,7 +304,7 @@ const InvoicePage: React.FC = () => {
                 inputMode="decimal"
                 value={item.rate} 
                 onChange={e => handleItemChange(item.id, 'rate', e.target.value)} 
-                className="w-full font-black text-[15px] py-1 text-center bg-transparent border-b-2 border-black focus:border-indigo-600 text-black outline-none" 
+                className="w-full font-black text-[15px] py-1 text-center bg-transparent border-b-2 border-black focus:border-indigo-600 text-black outline-none transition-all" 
                 placeholder="0"
               />
             </div>
@@ -318,21 +318,21 @@ const InvoicePage: React.FC = () => {
         ))}
       </div>
 
-      {/* Footer Controls */}
+      {/* Add Row & Total Section */}
       <div className="mt-10 flex justify-between items-center bg-gray-50 p-4 border-2 border-dashed border-gray-300">
         <button 
           onClick={addItem} 
-          className="bg-white border-2 border-black px-6 py-3 font-black uppercase text-[12px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5"
+          className="bg-white border-2 border-black px-6 py-3 font-black uppercase text-[12px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all"
         >
           + Add New Row
         </button>
         <div className="text-right">
-          <div className="text-[9px] font-black text-gray-400 uppercase leading-none tracking-widest">Total Payable</div>
+          <div className="text-[9px] font-black text-gray-400 uppercase leading-none tracking-widest">Total Amount</div>
           <div className="text-3xl font-black text-black">₹{formatNum(grandTotal)}</div>
         </div>
       </div>
 
-      {/* Main Actions at Bottom */}
+      {/* Main Action Buttons */}
       <div className="mt-16 space-y-4">
         <button 
           onClick={handleSave} 

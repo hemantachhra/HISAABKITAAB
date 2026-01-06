@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DB } from '../db';
@@ -136,8 +135,9 @@ const ReceiptPage: React.FC = () => {
         </div>
 
         <div className="pt-4 flex flex-col gap-2">
-          <button onClick={shareWhatsApp} className="w-full bg-green-600 text-white py-4 font-black uppercase tracking-widest border-b-4 border-green-800 active:border-b-0 active:translate-y-1">Share WhatsApp</button>
+          {/* Swapped order: Save is now first */}
           <button onClick={handleSave} className="w-full bg-black text-white py-4 font-black uppercase tracking-widest border-b-4 border-gray-700 active:border-b-0 active:translate-y-1">{isEditMode ? 'Update' : 'Save'}</button>
+          <button onClick={shareWhatsApp} className="w-full bg-green-600 text-white py-4 font-black uppercase tracking-widest border-b-4 border-green-800 active:border-b-0 active:translate-y-1">Share WhatsApp</button>
         </div>
       </div>
     </div>
