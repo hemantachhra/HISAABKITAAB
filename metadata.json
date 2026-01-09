@@ -1,5 +1,6 @@
 {
-  "name": "HISAAB KITAAB",
-  "description": "Challan Kitab Version 4 - GITHUB ONLINE\n-First Accounting System with Smart Merge",
+  "name": "CHALLAN KITAB",
+  "version": "1A",
+  "description": "Version 1A - Fast Offline Accounting with Enhanced Mobile Scroll",
   "requestFramePermissions": []
 }
