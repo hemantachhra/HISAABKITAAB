@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { DB } from '../db.ts';
-import { Ledger, InvoiceItem, Invoice } from '../types.ts';
+import { DB } from '../db';
+import { Ledger, InvoiceItem, Invoice } from '../types';
 
 const InvoicePage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -226,7 +226,6 @@ const InvoicePage: React.FC = () => {
 
   return (
     <div className="bg-white border-2 border-black p-2 md:p-8 invoice-font w-full mx-auto pb-64 text-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative pt-0">
-      {/* Sticky Header - Minimal top space */}
       <div className="sticky top-0 bg-white z-[100] border-2 border-black p-2 mb-2 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
         <div>
           <h1 className="text-lg font-black uppercase italic text-indigo-700 leading-none tracking-tighter">Challan</h1>
@@ -325,7 +324,6 @@ const InvoicePage: React.FC = () => {
         ))}
       </div>
 
-      {/* Adjusted Add Row button: Small box that rests on the line and is right-aligned */}
       <div className="mt-3 flex justify-end -mb-[2px] relative z-10">
         <button 
           type="button" 

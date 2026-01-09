@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DB } from '../db.ts';
-import { Ledger, Invoice, Receipt } from '../types.ts';
+import { DB } from '../db';
+import { Ledger, Invoice, Receipt } from '../types';
 
 const ReportsPage: React.FC = () => {
   const navigate = useNavigate();

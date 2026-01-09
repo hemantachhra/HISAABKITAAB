@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DB } from '../db.ts';
+import { DB } from '../db';
 
 const SettingsPage: React.FC = () => {
   const [stats, setStats] = useState({ invoices: 0, ledgers: 0, receipts: 0, version: '1' });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { DB } from '../db.ts';
-import { Ledger, Receipt } from '../types.ts';
+import { DB } from '../db';
+import { Ledger, Receipt } from '../types';
 
 const ReceiptPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -94,7 +94,6 @@ const ReceiptPage: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto bg-white border-2 border-black p-3 md:p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] pb-64 relative pt-0">
-      {/* Tight Header */}
       <div className="sticky top-0 bg-white z-[100] border-2 border-black p-2 mb-2 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
         <div>
           <h2 className="text-lg font-black uppercase italic text-indigo-700 leading-none tracking-tighter">Receipt</h2>
