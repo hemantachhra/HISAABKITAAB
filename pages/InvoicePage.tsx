@@ -10,7 +10,7 @@ const InvoicePage: React.FC = () => {
   const { showAlert } = useCustomModal();
   
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [serialNo, setSerialNo] = useState(1);
+  const [serialNo, setSerialNo] = useState<number | string>(1);
   const [ledgerName, setLedgerName] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -24,9 +24,6 @@ const InvoicePage: React.FC = () => {
       if (el) {
         el.focus();
         if ('select' in el) (el as any).select();
-        if (elementId === 'party-input') {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
       }
     }, 250);
   };
@@ -92,7 +89,6 @@ const InvoicePage: React.FC = () => {
     setItems(prev => prev.map(item => {
       if (item.id === itemId) {
         const updated = { ...item, [field]: value };
-        
         if (field === 'particulars') {
           const currentLedger = ledgers.find(l => l.name.toUpperCase() === ledgerName.trim().toUpperCase());
           if (currentLedger) {
@@ -104,7 +100,6 @@ const InvoicePage: React.FC = () => {
             }
           }
         }
-
         if (field === 'qty' || field === 'rate') {
           const q = field === 'qty' ? value : String(item.qty);
           const r = field === 'rate' ? value : String(item.rate);
@@ -114,13 +109,6 @@ const InvoicePage: React.FC = () => {
       }
       return item;
     }));
-  };
-
-  const handlePartyFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    const el = e.target;
-    setTimeout(() => {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 250);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, type: string, itemId?: string) => {
@@ -146,9 +134,14 @@ const InvoicePage: React.FC = () => {
 
   const handleSave = () => {
     const name = ledgerName.trim().toUpperCase();
+    const finalSerial = Number(serialNo);
+    
     if (!name) {
       showAlert("⚠️ ENTER PARTY NAME");
-      forceFocus('party-input');
+      return;
+    }
+    if (isNaN(finalSerial) || finalSerial <= 0) {
+      showAlert("⚠️ ENTER VALID SERIAL NO");
       return;
     }
 
@@ -158,69 +151,38 @@ const InvoicePage: React.FC = () => {
       const p = row.particulars.trim();
       const q = parseFloat(String(row.qty));
       const r = parseFloat(String(row.rate));
-      const hasContent = p !== '' || (!isNaN(q) && q !== 0) || (!isNaN(r) && r !== 0);
-
-      if (hasContent) {
-        if (!p) {
-          showAlert(`⚠️ MISSING PARTICULARS (ROW ${i + 1})`);
-          forceFocus(`particulars-${row.id}`);
-          return;
-        }
-        if (isNaN(q) || q <= 0) {
-          showAlert(`⚠️ INVALID QTY (ROW ${i + 1})`);
-          forceFocus(`qty-${row.id}`);
-          return;
-        }
-        if (isNaN(r) || r <= 0) {
-          showAlert(`⚠️ INVALID RATE (ROW ${i + 1})`);
-          forceFocus(`rate-${row.id}`);
+      if (p || (!isNaN(q) && q !== 0) || (!isNaN(r) && r !== 0)) {
+        if (!p || isNaN(q) || isNaN(r) || q <= 0 || r <= 0) {
+          showAlert(`⚠️ CHECK ROW ${i + 1}`);
           return;
         }
         cleanRows.push({ ...row, particulars: p, qty: q, rate: r, amount: q * r });
       }
     }
-
     if (cleanRows.length === 0) {
       showAlert("⚠️ ADD AT LEAST ONE ITEM");
-      forceFocus(`particulars-${items[0].id}`);
       return;
     }
-
     let ledger = ledgers.find(l => l.name.toUpperCase() === name);
     if (!ledger) {
-      const newLedger = DB.saveLedger({ id: DB.generateId(), name });
-      if (!newLedger) {
-        showAlert("❌ ERROR: Party record fail.");
-        return;
-      }
-      ledger = newLedger;
-      setLedgers(DB.getLedgers());
+      ledger = DB.saveLedger({ id: DB.generateId(), name })!;
     }
-
     const invoice: Invoice = {
       id: isEditMode && id ? id : DB.generateId(),
-      serialNo,
+      serialNo: finalSerial,
       date,
       ledgerId: ledger.id,
       items: cleanRows,
       grandTotal: cleanRows.reduce((sum, row) => sum + row.amount, 0)
     };
-
-    const success = isEditMode ? DB.updateInvoice(invoice) : DB.saveInvoice(invoice);
-    
-    if (success) {
-      if (isEditMode) {
-        showAlert("✅ UPDATED!");
-        navigate('/reports');
-      } else {
+    if (isEditMode ? DB.updateInvoice(invoice) : DB.saveInvoice(invoice)) {
+      showAlert("✅ SAVED!");
+      if (isEditMode) navigate('/reports');
+      else {
         setLedgerName('');
         setItems([{ id: DB.generateId(), particulars: '', qty: '', rate: '', amount: 0 }]);
         setSerialNo(DB.getNextSerial());
-        forceFocus('party-input');
-        showAlert("✅ SAVED!");
       }
-    } else {
-      showAlert("❌ STORAGE FULL?");
     }
   };
 
@@ -228,7 +190,6 @@ const InvoicePage: React.FC = () => {
 
   return (
     <div className="bg-white border-2 border-black p-2 md:p-8 invoice-font w-full mx-auto pb-64 text-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative pt-0">
-      {/* Sticky Header */}
       <div className="sticky top-0 bg-white z-[100] border-2 border-black p-2 mb-2 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
         <div>
           <h1 className="text-lg font-black uppercase italic text-indigo-700 leading-none tracking-tighter">Challan</h1>
@@ -237,9 +198,18 @@ const InvoicePage: React.FC = () => {
         <div className="flex items-center gap-2">
           <div className="text-right">
             <div className="text-[7px] font-black text-gray-500 uppercase leading-none">Serial</div>
-            <div className="text-base font-black leading-none">#{String(serialNo).padStart(2, '0')}</div>
+            <div className="flex items-center justify-end">
+              <span className="text-base font-black leading-none mr-0.5">#</span>
+              <input 
+                type="text" 
+                inputMode="numeric"
+                value={serialNo} 
+                onChange={e => setSerialNo(e.target.value)}
+                className="text-base font-black leading-none w-12 text-right bg-transparent border-b border-dashed border-black focus:border-black outline-none"
+              />
+            </div>
           </div>
-          <button type="button" onClick={handleSave} className="bg-indigo-700 text-white p-2 rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center justify-center">
+          <button type="button" onClick={handleSave} className="bg-indigo-700 text-white p-2 rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/></svg>
           </button>
         </div>
@@ -253,14 +223,13 @@ const InvoicePage: React.FC = () => {
             type="text" 
             autoComplete="off"
             value={ledgerName}
-            onFocus={handlePartyFocus}
             onKeyDown={(e) => handleKeyDown(e, 'name')}
             onChange={e => { setLedgerName(e.target.value); setShowSuggestions(true); }}
-            className="w-full border-b-2 border-black py-0.5 text-lg font-black uppercase focus:outline-none bg-transparent" 
+            className="w-full border-b-2 border-black py-0.5 text-lg font-black uppercase focus:outline-none bg-transparent text-center" 
             placeholder="TYPE NAME..."
           />
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-50 w-full bg-white border-2 border-black mt-1 shadow-2xl max-h-48 overflow-y-auto">
+            <div className="absolute z-50 w-full bg-white border-2 border-black mt-1 shadow-2xl">
               {suggestions.map(s => (
                 <div key={s.id} onClick={() => { setLedgerName(s.name); setShowSuggestions(false); }} className="p-2 border-b last:border-0 font-black uppercase hover:bg-black hover:text-white cursor-pointer text-sm">
                   {s.name}
@@ -272,10 +241,9 @@ const InvoicePage: React.FC = () => {
       </div>
 
       <div className="space-y-1">
-        {/* Adjusted grid column spans for more Qty space: 4 (P), 3 (Q), 2 (R), 2 (T), 1 (X) */}
         <div className="grid grid-cols-12 gap-1 text-[7px] font-black uppercase text-black border-b border-black pb-0.5">
-          <div className="col-span-4">Particulars</div>
-          <div className="col-span-3 text-center">Qty</div>
+          <div className="col-span-3">Particulars</div>
+          <div className="col-span-4 text-center">Qty</div>
           <div className="col-span-2 text-center">Rate</div>
           <div className="col-span-2 text-right">Total</div>
           <div className="col-span-1"></div>
@@ -283,64 +251,29 @@ const InvoicePage: React.FC = () => {
 
         {items.map((item) => (
           <div key={item.id} className="grid grid-cols-12 gap-1 items-center border-b border-gray-100 pb-1">
-            <div className="col-span-4">
-              <input 
-                id={`particulars-${item.id}`} 
-                type="text" 
-                value={item.particulars} 
-                onKeyDown={(e) => handleKeyDown(e, 'particulars', item.id)} 
-                onChange={e => handleItemChange(item.id, 'particulars', e.target.value)} 
-                className="w-full font-bold uppercase text-[13px] outline-none bg-transparent" 
-                placeholder="..." 
-              />
-            </div>
             <div className="col-span-3">
-              <input 
-                id={`qty-${item.id}`} 
-                type="text" 
-                inputMode="decimal" 
-                value={item.qty} 
-                onKeyDown={(e) => handleKeyDown(e, 'qty', item.id)} 
-                onChange={e => handleItemChange(item.id, 'qty', e.target.value)} 
-                className="w-full font-black text-[13px] text-center bg-transparent border-b border-transparent focus:border-black outline-none px-1" 
-                placeholder="0.00"
-              />
+              <input id={`particulars-${item.id}`} type="text" value={item.particulars} onKeyDown={(e) => handleKeyDown(e, 'particulars', item.id)} onChange={e => handleItemChange(item.id, 'particulars', e.target.value)} className="w-full font-bold uppercase text-[12px] outline-none bg-transparent" placeholder="..." />
+            </div>
+            <div className="col-span-4">
+              <input id={`qty-${item.id}`} type="text" inputMode="decimal" value={item.qty} onKeyDown={(e) => handleKeyDown(e, 'qty', item.id)} onChange={e => handleItemChange(item.id, 'qty', e.target.value)} className="w-full font-black text-[13px] text-center bg-transparent border-b border-transparent focus:border-black outline-none" placeholder="0.00" />
             </div>
             <div className="col-span-2">
-              <input 
-                id={`rate-${item.id}`} 
-                type="text" 
-                inputMode="decimal" 
-                value={item.rate} 
-                onKeyDown={(e) => handleKeyDown(e, 'rate', item.id)} 
-                onChange={e => handleItemChange(item.id, 'rate', e.target.value)} 
-                className="w-full font-black text-[13px] text-center bg-transparent border-b border-transparent focus:border-black outline-none" 
-              />
+              <input id={`rate-${item.id}`} type="text" inputMode="decimal" value={item.rate} onKeyDown={(e) => handleKeyDown(e, 'rate', item.id)} onChange={e => handleItemChange(item.id, 'rate', e.target.value)} className="w-full font-black text-[13px] text-center bg-transparent border-b border-transparent focus:border-black outline-none" />
             </div>
-            <div className="col-span-2 text-right font-black text-[13px] truncate">
-              {formatNum(item.amount)}
-            </div>
+            <div className="col-span-2 text-right font-black text-[13px] truncate">{formatNum(item.amount)}</div>
             <div className="col-span-1 text-right">
-              <button type="button" onClick={() => removeItem(item.id)} className="text-black hover:text-red-600 transition-colors p-1">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
+              <button type="button" onClick={() => removeItem(item.id)} className="text-black hover:text-red-600 p-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="mt-3 flex justify-end -mb-[2px] relative z-10">
-        <button 
-          type="button" 
-          onClick={addItem} 
-          className="w-auto px-4 py-1.5 border-2 border-dashed border-black bg-white font-black uppercase text-[8px] hover:bg-gray-50 tracking-widest"
-        >
-          + Add Row
-        </button>
+      <div className="mt-3 flex justify-end">
+        <button type="button" onClick={addItem} className="px-4 py-1.5 border-2 border-dashed border-black font-black uppercase text-[8px] tracking-widest">+ Add Row</button>
       </div>
 
       <div className="flex justify-between items-end border-t-2 border-black pt-1">
-        <div className="text-[7px] font-black uppercase text-gray-500 tracking-tighter italic">Official</div>
+        <div className="text-[7px] font-black uppercase text-gray-500 italic">Official</div>
         <div className="text-right">
           <div className="text-[9px] font-black uppercase opacity-60">Grand Total</div>
           <div className="text-3xl font-black">₹{formatNum(grandTotal)}</div>

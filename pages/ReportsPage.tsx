@@ -10,17 +10,6 @@ const ReportsPage: React.FC = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [receipts, setReceipts] = useState<Receipt[]>([]);
   const [filterName, setFilterName] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-
-  const formatNum = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-  
-  const formatDDMMYY = (d: string) => {
-    if (!d) return '';
-    const [y, m, day] = d.split('-');
-    return `${day}-${m}-${y.slice(-2)}`;
-  };
 
   useEffect(() => {
     setLedgers(DB.getLedgers());
@@ -28,32 +17,18 @@ const ReportsPage: React.FC = () => {
     setReceipts(DB.getReceipts());
   }, []);
 
-  const dashboardStats = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const dailySales = invoices.filter(i => i.date === today).reduce((sum, i) => sum + i.grandTotal, 0);
-    const dailyCash = receipts.filter(r => r.date === today).reduce((sum, r) => sum + Number(r.amount), 0);
-    const totalReceivable = ledgers.reduce((sum, l) => {
-      const d = invoices.filter(i => i.ledgerId === l.id).reduce((s, i) => s + i.grandTotal, 0);
-      const c = receipts.filter(r => r.ledgerId === l.id).reduce((s, r) => s + Number(r.amount), 0);
-      return sum + Math.max(0, d - c);
-    }, 0);
-    return { dailySales, dailyCash, totalReceivable };
-  }, [invoices, receipts, ledgers]);
+  const formatNum = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const formatDDMMYY = (d: string) => {
+    if (!d) return '';
+    const [y, m, day] = d.split('-');
+    return `${day}-${m}-${y.slice(-2)}`;
+  };
 
   const ledgerMap = useMemo(() => {
     const map: Record<string, string> = {};
     ledgers.forEach(l => map[l.id] = l.name);
     return map;
   }, [ledgers]);
-
-  const suggestions = useMemo(() => {
-    const q = filterName.trim().toLowerCase();
-    if (!q) return [];
-    const uniqueNames = Array.from(new Set(ledgers.map(l => l.name.toUpperCase()))) as string[];
-    return uniqueNames
-      .filter(name => name.toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [filterName, ledgers]);
 
   const summaries = useMemo(() => {
     const data = ledgers.map(l => {
@@ -62,21 +37,8 @@ const ReportsPage: React.FC = () => {
       const c = receipts.filter(r => r.ledgerId === lid).reduce((s, r) => s + Number(r.amount), 0);
       return { id: l.id, name: l.name, debit: d, credit: c, closing: d - c };
     });
-    
-    const grouped = data.reduce((acc, curr) => {
-      const name = curr.name.toUpperCase();
-      if (!acc[name]) { acc[name] = { ...curr }; } 
-      else {
-        acc[name].debit += curr.debit;
-        acc[name].credit += curr.credit;
-        acc[name].closing += curr.closing;
-      }
-      return acc;
-    }, {} as Record<string, any>);
-
-    let res = Object.values(grouped);
-    if (filterName) res = res.filter((s: any) => s.name.toLowerCase().includes(filterName.toLowerCase()));
-    return res.sort((a: any, b: any) => a.name.localeCompare(b.name));
+    let res = data.filter(d => !filterName || d.name.toLowerCase().includes(filterName.toLowerCase()));
+    return res.sort((a, b) => a.name.localeCompare(b.name));
   }, [ledgers, invoices, receipts, filterName]);
 
   const history = useMemo(() => {
@@ -85,106 +47,83 @@ const ReportsPage: React.FC = () => {
       ...invoices.map(i => ({
         id: i.id, date: i.date, type: 'INV', no: i.serialNo, 
         name: ledgerMap[i.ledgerId] || 'Unknown',
-        debit: i.grandTotal, credit: 0,
-        editUrl: `/edit-invoice/${i.id}`
+        debit: i.grandTotal, credit: 0, editUrl: `/edit-invoice/${i.id}`
       })),
       ...receipts.map(r => ({
-        id: r.id, date: r.date, type: `RCT-${r.mode.toUpperCase()}`, no: null, 
+        id: r.id, date: r.date, type: `RT-${r.mode.toUpperCase()}`, no: null, 
         name: ledgerMap[r.ledgerId] || 'Unknown',
-        debit: 0, credit: Number(r.amount),
-        editUrl: `/edit-receipt/${r.id}`
+        debit: 0, credit: Number(r.amount), editUrl: `/edit-receipt/${r.id}`
       }))
     ];
     items.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
-    
-    const filtered = items.filter(t => {
-      const nameMatch = !q || t.name.toLowerCase().includes(q);
-      const dateMatch = (!startDate || t.date >= startDate) && (!endDate || t.date <= endDate);
-      return nameMatch && dateMatch;
-    });
-    
+    const filtered = items.filter(t => !q || t.name.toLowerCase().includes(q));
     let runningBal = 0;
     return filtered.map(t => {
       runningBal += (t.debit - t.credit);
       return { ...t, balance: runningBal };
     });
-  }, [invoices, receipts, ledgerMap, filterName, startDate, endDate]);
+  }, [invoices, receipts, ledgerMap, filterName]);
 
-  const shareReport = () => {
-    let msg = `*CK REPORT - ${new Date().toLocaleDateString()}*\n\n`;
+  const shareReport = async () => {
+    const today = new Date().toLocaleDateString();
+    let msg = `*CHALLAN KITAB REPORT - ${today}*\n\n`;
+    
     if (activeTab === 'balances') {
-      msg += `*LEDGER BALANCES*\n`;
+      msg += `*PENDING BALANCES*\n`;
       summaries.filter(s => s.closing !== 0).forEach(s => {
-        msg += `${s.name}: ₹${formatNum(Math.abs(s.closing))} ${s.closing > 0 ? 'DR' : 'CR'}\n`;
+        msg += `• ${s.name}: ₹${formatNum(Math.abs(s.closing))} ${s.closing > 0 ? 'DR' : 'CR'}\n`;
       });
     } else {
-      msg += `*STATEMENT: ${filterName || 'ALL'}*\n`;
+      msg += `*LEDGER: ${filterName || 'ALL RECORDS'}*\n`;
       history.slice(-15).forEach(t => {
-        msg += `${formatDDMMYY(t.date)}: ${t.type} | ${t.debit > 0 ? 'DR '+formatNum(t.debit) : 'CR '+formatNum(t.credit)}\n`;
+        msg += `${formatDDMMYY(t.date)}: ${t.type} ${t.no || ''} | ${t.debit > 0 ? 'DR '+formatNum(t.debit) : 'CR '+formatNum(t.credit)}\n`;
       });
-      if (history.length > 0) msg += `\n*Final Bal: ₹${formatNum(history[history.length-1].balance)}*`;
+      if (history.length > 0) {
+        const final = history[history.length-1];
+        msg += `\n*CURRENT BALANCE: ₹${formatNum(final.balance)}*`;
+      }
     }
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Accounting Report',
+          text: msg
+        });
+      } catch (e) {
+        console.error('Error sharing', e);
+      }
+    } else {
+      // Fallback for older browsers
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    }
   };
 
   return (
     <div className="space-y-6 pb-40">
-      <div className="grid grid-cols-3 gap-2">
-        <div className="bg-indigo-600 text-white p-3 border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-          <div className="text-[8px] font-black uppercase opacity-70">Sales Today</div>
-          <div className="text-sm font-black truncate">₹{formatNum(dashboardStats.dailySales)}</div>
-        </div>
-        <div className="bg-green-600 text-white p-3 border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-          <div className="text-[8px] font-black uppercase opacity-70">Cash Today</div>
-          <div className="text-sm font-black truncate">₹{formatNum(dashboardStats.dailyCash)}</div>
-        </div>
-        <div className="bg-black text-white p-3 border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
-          <div className="text-[8px] font-black uppercase opacity-70">Total Due</div>
-          <div className="text-sm font-black truncate">₹{formatNum(dashboardStats.totalReceivable)}</div>
-        </div>
-      </div>
-
-      <div className="bg-white border-2 border-black p-4 space-y-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] relative">
-        <div className="relative">
-          <input 
-            type="text" 
-            autoComplete="off"
-            value={filterName} 
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-            onChange={e => { setFilterName(e.target.value); setShowSuggestions(true); }} 
-            placeholder="SEARCH CUSTOMER..." 
-            className="w-full border-b-2 border-black p-2 font-black uppercase text-lg bg-transparent focus:outline-none" 
-          />
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-[100] w-full bg-white border-2 border-black mt-1 shadow-2xl max-h-48 overflow-y-auto">
-              {suggestions.map((name, idx) => (
-                <div 
-                  key={idx} 
-                  onClick={() => { setFilterName(name); setShowSuggestions(false); }} 
-                  className="p-3 border-b last:border-0 font-black uppercase hover:bg-black hover:text-white cursor-pointer text-sm"
-                >
-                  {name}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="bg-white border-2 border-black p-4 space-y-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+        <input 
+          type="text" 
+          value={filterName} 
+          onChange={e => setFilterName(e.target.value)} 
+          placeholder="SEARCH CUSTOMER..." 
+          className="w-full border-b-2 border-black p-2 font-black uppercase text-lg bg-transparent focus:outline-none" 
+        />
         <div className="flex gap-2">
-          <button onClick={() => setActiveTab('balances')} className={`flex-1 py-2 font-black text-[10px] uppercase border-2 border-black ${activeTab === 'balances' ? 'bg-black text-white' : 'bg-white'}`}>Balances</button>
-          <button onClick={() => setActiveTab('summary')} className={`flex-1 py-2 font-black text-[10px] uppercase border-2 border-black ${activeTab === 'summary' ? 'bg-black text-white' : 'bg-white'}`}>Ledger</button>
+          <button onClick={() => setActiveTab('balances')} className={`flex-1 py-2 font-black text-[10px] uppercase border-2 border-black transition-colors ${activeTab === 'balances' ? 'bg-black text-white' : 'bg-white text-black'}`}>Balances</button>
+          <button onClick={() => setActiveTab('summary')} className={`flex-1 py-2 font-black text-[10px] uppercase border-2 border-black transition-colors ${activeTab === 'summary' ? 'bg-black text-white' : 'bg-white text-black'}`}>Ledger</button>
         </div>
       </div>
 
       <div className="bg-white border-2 border-black overflow-x-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-        <table className="w-full text-[9px] uppercase">
+        <table className="w-full text-[10px] uppercase">
           {activeTab === 'balances' ? (
             <>
               <thead className="bg-gray-50 border-b-2 border-black font-black">
-                <tr><th className="p-2 text-left">Party</th><th className="p-2 text-right">Dr</th><th className="p-2 text-right">Cr</th><th className="p-2 text-right">Net</th></tr>
+                <tr><th className="p-2 text-left">Party</th><th className="p-2 text-right">Debit</th><th className="p-2 text-right">Credit</th><th className="p-2 text-right">Net</th></tr>
               </thead>
               <tbody>
-                {summaries.map((s: any, i) => (
+                {summaries.map((s, i) => (
                   <tr key={i} className="border-b last:border-0 font-bold">
                     <td className="p-2">{s.name}</td>
                     <td className="p-2 text-right text-red-600">{formatNum(s.debit)}</td>
@@ -197,37 +136,18 @@ const ReportsPage: React.FC = () => {
           ) : (
             <>
               <thead className="bg-gray-50 border-b-2 border-black font-black">
-                <tr>
-                  <th className="p-2 text-left">Date</th>
-                  <th className="p-2 text-left">Origin</th>
-                  <th className="p-2 text-right">Dr/Cr</th>
-                  <th className="p-2 text-right">Bal</th>
-                  <th className="p-2 text-center">Edit</th>
-                </tr>
+                <tr><th className="p-2 text-left">Date</th><th className="p-2 text-left">Origin</th><th className="p-2 text-right">Dr/Cr</th><th className="p-2 text-right">Bal</th><th className="p-2"></th></tr>
               </thead>
               <tbody>
                 {history.map((t, i) => (
-                  <tr key={i} className="border-b last:border-0 items-center">
+                  <tr key={i} className="border-b last:border-0">
                     <td className="p-2 whitespace-nowrap">{formatDDMMYY(t.date)}</td>
-                    <td className="p-2 font-black">
-                      <span className={`px-1 rounded-[1px] ${t.type.startsWith('INV') ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'}`}>
-                        {t.type} {t.no || ''}
-                      </span>
-                    </td>
-                    <td className="p-2 text-right">
-                      {t.debit > 0 ? (
-                        <span className="text-red-600 font-bold">{formatNum(t.debit)}</span>
-                      ) : (
-                        <span className="text-green-600 font-bold">{formatNum(t.credit)}</span>
-                      )}
-                    </td>
+                    <td className="p-2 font-black">{t.type} {t.no || ''}</td>
+                    <td className="p-2 text-right">{t.debit > 0 ? <span className="text-red-600">DR {formatNum(t.debit)}</span> : <span className="text-green-600">CR {formatNum(t.credit)}</span>}</td>
                     <td className="p-2 text-right font-black">{formatNum(t.balance)}</td>
                     <td className="p-2 text-center">
-                      <button 
-                        onClick={() => navigate(t.editUrl)}
-                        className="bg-black text-white p-1 rounded-sm shadow-[1px_1px_0px_0px_rgba(79,70,229,1)] hover:bg-indigo-700 transition-all active:shadow-none active:translate-y-0.5"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                      <button onClick={() => navigate(t.editUrl)} className="p-1 bg-black text-white rounded shadow-[1px_1px_0px_0px_rgba(79,70,229,1)] active:translate-y-0.5 active:shadow-none">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                       </button>
                     </td>
                   </tr>
@@ -238,7 +158,10 @@ const ReportsPage: React.FC = () => {
         </table>
       </div>
 
-      <button onClick={shareReport} className="w-full bg-green-600 text-white p-4 font-black uppercase text-xs border-b-4 border-green-800 active:border-b-0 active:translate-y-1 transition-all">Share on WhatsApp</button>
+      <button onClick={shareReport} className="w-full bg-green-600 text-white p-4 font-black uppercase text-xs border-b-4 border-green-800 active:border-b-0 active:translate-y-1 transition-all flex items-center justify-center gap-2">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+        Share Report
+      </button>
     </div>
   );
 };
