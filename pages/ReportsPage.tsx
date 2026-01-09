@@ -85,12 +85,14 @@ const ReportsPage: React.FC = () => {
       ...invoices.map(i => ({
         id: i.id, date: i.date, type: 'INV', no: i.serialNo, 
         name: ledgerMap[i.ledgerId] || 'Unknown',
-        debit: i.grandTotal, credit: 0
+        debit: i.grandTotal, credit: 0,
+        editUrl: `/edit-invoice/${i.id}`
       })),
       ...receipts.map(r => ({
-        id: r.id, date: r.date, type: 'RCT', no: null, 
+        id: r.id, date: r.date, type: `RCT-${r.mode.toUpperCase()}`, no: null, 
         name: ledgerMap[r.ledgerId] || 'Unknown',
-        debit: 0, credit: Number(r.amount)
+        debit: 0, credit: Number(r.amount),
+        editUrl: `/edit-receipt/${r.id}`
       }))
     ];
     items.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
@@ -117,8 +119,8 @@ const ReportsPage: React.FC = () => {
       });
     } else {
       msg += `*STATEMENT: ${filterName || 'ALL'}*\n`;
-      history.slice(-10).forEach(t => {
-        msg += `${formatDDMMYY(t.date)}: ${t.debit > 0 ? 'DR '+formatNum(t.debit) : 'CR '+formatNum(t.credit)}\n`;
+      history.slice(-15).forEach(t => {
+        msg += `${formatDDMMYY(t.date)}: ${t.type} | ${t.debit > 0 ? 'DR '+formatNum(t.debit) : 'CR '+formatNum(t.credit)}\n`;
       });
       if (history.length > 0) msg += `\n*Final Bal: ₹${formatNum(history[history.length-1].balance)}*`;
     }
@@ -175,11 +177,11 @@ const ReportsPage: React.FC = () => {
       </div>
 
       <div className="bg-white border-2 border-black overflow-x-auto shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-        <table className="w-full text-[10px] uppercase">
+        <table className="w-full text-[9px] uppercase">
           {activeTab === 'balances' ? (
             <>
               <thead className="bg-gray-50 border-b-2 border-black font-black">
-                <tr><th className="p-2 text-left">Party</th><th className="p-2 text-right">Debit</th><th className="p-2 text-right">Credit</th><th className="p-2 text-right">Net</th></tr>
+                <tr><th className="p-2 text-left">Party</th><th className="p-2 text-right">Dr</th><th className="p-2 text-right">Cr</th><th className="p-2 text-right">Net</th></tr>
               </thead>
               <tbody>
                 {summaries.map((s: any, i) => (
@@ -195,16 +197,39 @@ const ReportsPage: React.FC = () => {
           ) : (
             <>
               <thead className="bg-gray-50 border-b-2 border-black font-black">
-                <tr><th className="p-2 text-left">Date</th><th className="p-2 text-left">Type</th><th className="p-2 text-right">Dr</th><th className="p-2 text-right">Cr</th><th className="p-2 text-right">Bal</th></tr>
+                <tr>
+                  <th className="p-2 text-left">Date</th>
+                  <th className="p-2 text-left">Origin</th>
+                  <th className="p-2 text-right">Dr/Cr</th>
+                  <th className="p-2 text-right">Bal</th>
+                  <th className="p-2 text-center">Edit</th>
+                </tr>
               </thead>
               <tbody>
                 {history.map((t, i) => (
-                  <tr key={i} className="border-b last:border-0">
-                    <td className="p-2">{formatDDMMYY(t.date)}</td>
-                    <td className="p-2 font-black">{t.type} {t.no || ''}</td>
-                    <td className="p-2 text-right text-red-600">{t.debit > 0 ? formatNum(t.debit) : '—'}</td>
-                    <td className="p-2 text-right text-green-600">{t.credit > 0 ? formatNum(t.credit) : '—'}</td>
+                  <tr key={i} className="border-b last:border-0 items-center">
+                    <td className="p-2 whitespace-nowrap">{formatDDMMYY(t.date)}</td>
+                    <td className="p-2 font-black">
+                      <span className={`px-1 rounded-[1px] ${t.type.startsWith('INV') ? 'bg-indigo-100 text-indigo-800' : 'bg-green-100 text-green-800'}`}>
+                        {t.type} {t.no || ''}
+                      </span>
+                    </td>
+                    <td className="p-2 text-right">
+                      {t.debit > 0 ? (
+                        <span className="text-red-600 font-bold">{formatNum(t.debit)}</span>
+                      ) : (
+                        <span className="text-green-600 font-bold">{formatNum(t.credit)}</span>
+                      )}
+                    </td>
                     <td className="p-2 text-right font-black">{formatNum(t.balance)}</td>
+                    <td className="p-2 text-center">
+                      <button 
+                        onClick={() => navigate(t.editUrl)}
+                        className="bg-black text-white p-1 rounded-sm shadow-[1px_1px_0px_0px_rgba(79,70,229,1)] hover:bg-indigo-700 transition-all active:shadow-none active:translate-y-0.5"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

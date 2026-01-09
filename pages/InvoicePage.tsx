@@ -2,10 +2,12 @@ import React, { useState, useEffect, useMemo, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DB } from '../db';
 import { Ledger, InvoiceItem, Invoice } from '../types';
+import { useCustomModal } from '../App';
 
 const InvoicePage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const { showAlert } = useCustomModal();
   
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [serialNo, setSerialNo] = useState(1);
@@ -145,7 +147,7 @@ const InvoicePage: React.FC = () => {
   const handleSave = () => {
     const name = ledgerName.trim().toUpperCase();
     if (!name) {
-      alert("⚠️ ENTER PARTY NAME");
+      showAlert("⚠️ ENTER PARTY NAME");
       forceFocus('party-input');
       return;
     }
@@ -160,17 +162,17 @@ const InvoicePage: React.FC = () => {
 
       if (hasContent) {
         if (!p) {
-          alert(`⚠️ MISSING PARTICULARS (ROW ${i + 1})`);
+          showAlert(`⚠️ MISSING PARTICULARS (ROW ${i + 1})`);
           forceFocus(`particulars-${row.id}`);
           return;
         }
         if (isNaN(q) || q <= 0) {
-          alert(`⚠️ INVALID QTY (ROW ${i + 1})`);
+          showAlert(`⚠️ INVALID QTY (ROW ${i + 1})`);
           forceFocus(`qty-${row.id}`);
           return;
         }
         if (isNaN(r) || r <= 0) {
-          alert(`⚠️ INVALID RATE (ROW ${i + 1})`);
+          showAlert(`⚠️ INVALID RATE (ROW ${i + 1})`);
           forceFocus(`rate-${row.id}`);
           return;
         }
@@ -179,7 +181,7 @@ const InvoicePage: React.FC = () => {
     }
 
     if (cleanRows.length === 0) {
-      alert("⚠️ ADD AT LEAST ONE ITEM");
+      showAlert("⚠️ ADD AT LEAST ONE ITEM");
       forceFocus(`particulars-${items[0].id}`);
       return;
     }
@@ -188,7 +190,7 @@ const InvoicePage: React.FC = () => {
     if (!ledger) {
       const newLedger = DB.saveLedger({ id: DB.generateId(), name });
       if (!newLedger) {
-        alert("❌ ERROR: Party record fail.");
+        showAlert("❌ ERROR: Party record fail.");
         return;
       }
       ledger = newLedger;
@@ -208,17 +210,17 @@ const InvoicePage: React.FC = () => {
     
     if (success) {
       if (isEditMode) {
-        alert("✅ UPDATED!");
+        showAlert("✅ UPDATED!");
         navigate('/reports');
       } else {
         setLedgerName('');
         setItems([{ id: DB.generateId(), particulars: '', qty: '', rate: '', amount: 0 }]);
         setSerialNo(DB.getNextSerial());
         forceFocus('party-input');
-        alert("✅ SAVED!");
+        showAlert("✅ SAVED!");
       }
     } else {
-      alert("❌ STORAGE FULL?");
+      showAlert("❌ STORAGE FULL?");
     }
   };
 
@@ -226,6 +228,7 @@ const InvoicePage: React.FC = () => {
 
   return (
     <div className="bg-white border-2 border-black p-2 md:p-8 invoice-font w-full mx-auto pb-64 text-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative pt-0">
+      {/* Sticky Header */}
       <div className="sticky top-0 bg-white z-[100] border-2 border-black p-2 mb-2 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
         <div>
           <h1 className="text-lg font-black uppercase italic text-indigo-700 leading-none tracking-tighter">Challan</h1>
@@ -269,10 +272,11 @@ const InvoicePage: React.FC = () => {
       </div>
 
       <div className="space-y-1">
+        {/* Adjusted grid column spans for more Qty space: 4 (P), 3 (Q), 2 (R), 2 (T), 1 (X) */}
         <div className="grid grid-cols-12 gap-1 text-[7px] font-black uppercase text-black border-b border-black pb-0.5">
           <div className="col-span-4">Particulars</div>
-          <div className="col-span-2 text-center">Qty</div>
-          <div className="col-span-3 text-center">Rate</div>
+          <div className="col-span-3 text-center">Qty</div>
+          <div className="col-span-2 text-center">Rate</div>
           <div className="col-span-2 text-right">Total</div>
           <div className="col-span-1"></div>
         </div>
@@ -290,7 +294,7 @@ const InvoicePage: React.FC = () => {
                 placeholder="..." 
               />
             </div>
-            <div className="col-span-2">
+            <div className="col-span-3">
               <input 
                 id={`qty-${item.id}`} 
                 type="text" 
@@ -298,10 +302,11 @@ const InvoicePage: React.FC = () => {
                 value={item.qty} 
                 onKeyDown={(e) => handleKeyDown(e, 'qty', item.id)} 
                 onChange={e => handleItemChange(item.id, 'qty', e.target.value)} 
-                className="w-full font-black text-[13px] text-center bg-transparent border-b border-transparent focus:border-black outline-none" 
+                className="w-full font-black text-[13px] text-center bg-transparent border-b border-transparent focus:border-black outline-none px-1" 
+                placeholder="0.00"
               />
             </div>
-            <div className="col-span-3">
+            <div className="col-span-2">
               <input 
                 id={`rate-${item.id}`} 
                 type="text" 

@@ -2,10 +2,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DB } from '../db';
 import { Ledger, Receipt } from '../types';
+import { useCustomModal } from '../App';
 
 const ReceiptPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const { showAlert } = useCustomModal();
+
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [ledgerName, setLedgerName] = useState('');
   const [amount, setAmount] = useState<string>('');
@@ -51,12 +54,12 @@ const ReceiptPage: React.FC = () => {
     const cleanAmount = parseFloat(amount);
 
     if (!cleanName) {
-      alert("⚠️ ENTER PARTY NAME");
+      showAlert("⚠️ ENTER PARTY NAME");
       return;
     }
 
     if (isNaN(cleanAmount) || cleanAmount <= 0) {
-      alert("⚠️ INVALID AMOUNT");
+      showAlert("⚠️ INVALID AMOUNT");
       return;
     }
 
@@ -64,7 +67,7 @@ const ReceiptPage: React.FC = () => {
     if (!target) {
       const newLedger = DB.saveLedger({ id: DB.generateId(), name: cleanName });
       if (!newLedger) {
-        alert("❌ ERROR: Party fail.");
+        showAlert("❌ ERROR: Party fail.");
         return;
       }
       target = newLedger;
@@ -80,7 +83,7 @@ const ReceiptPage: React.FC = () => {
     };
 
     if (isEditMode ? DB.updateReceipt(receipt) : DB.saveReceipt(receipt)) {
-      alert("✅ SAVED!");
+      showAlert("✅ SAVED!");
       if (isEditMode) {
         navigate('/reports');
       } else { 
@@ -88,7 +91,7 @@ const ReceiptPage: React.FC = () => {
         setAmount(''); 
       }
     } else {
-      alert("❌ FAILED");
+      showAlert("❌ FAILED");
     }
   };
 
