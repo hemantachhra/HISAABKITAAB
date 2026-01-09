@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DB } from '../db';
+import { DB } from '../db.ts';
 
 const SettingsPage: React.FC = () => {
   const [stats, setStats] = useState({ invoices: 0, ledgers: 0, receipts: 0, version: '1' });
@@ -44,17 +44,11 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleReset = () => {
-    // Explicit warning before anything happens
     const confirmed = window.confirm("⚠️ FATAL: ERASE ALL DATA? ⚠️\n\nThis will wipe your current bookkeeping book completely. This action IS IRREVERSIBLE.");
     
     if (confirmed) {
-      // 1. Wipe the data
       DB.clearAll();
-      
-      // 2. Update local display state immediately to show 0
       setStats({ invoices: 0, ledgers: 0, receipts: 0, version: '1' });
-      
-      // 3. Short delay before redirect to allow state update to be visible
       setTimeout(() => {
         window.location.replace(window.location.origin + window.location.pathname);
       }, 500);

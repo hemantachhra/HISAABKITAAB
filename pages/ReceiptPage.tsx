@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { DB } from '../db';
-import { Ledger, Receipt } from '../types';
+import { DB } from '../db.ts';
+import { Ledger, Receipt } from '../types.ts';
 
 const ReceiptPage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -13,8 +13,6 @@ const ReceiptPage: React.FC = () => {
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-
-  const formatNum = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
   useEffect(() => {
     setLedgers(DB.getLedgers());
@@ -32,71 +30,104 @@ const ReceiptPage: React.FC = () => {
 
   const suggestions = useMemo(() => {
     const q = ledgerName.trim().toLowerCase();
-    return q ? ledgers.filter(l => l.name.toLowerCase().includes(q)) : [];
+    if (!q) return [];
+    const uniqueMap = new Map();
+    ledgers.forEach(l => {
+      const name = l.name.toUpperCase();
+      if (!uniqueMap.has(name)) uniqueMap.set(name, l);
+    });
+    return Array.from(uniqueMap.values()).filter((l: any) => l.name.toLowerCase().includes(q)).slice(0, 10);
   }, [ledgerName, ledgers]);
 
-  const handleInputFocus = (e: React.FocusEvent<any>) => {
-    const target = e.target;
+  const handlePartyFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    const el = e.target;
     setTimeout(() => {
-      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 450);
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 250);
   };
 
   const handleSave = () => {
-    const cleanName = ledgerName.trim();
+    const cleanName = ledgerName.trim().toUpperCase();
     const cleanAmount = parseFloat(amount);
-    if (!cleanName || isNaN(cleanAmount) || cleanAmount <= 0) return alert("Check Name/Amount.");
 
-    let target = ledgers.find(l => l.name.toLowerCase() === cleanName.toLowerCase());
+    if (!cleanName) {
+      alert("⚠️ ENTER PARTY NAME");
+      return;
+    }
+
+    if (isNaN(cleanAmount) || cleanAmount <= 0) {
+      alert("⚠️ INVALID AMOUNT");
+      return;
+    }
+
+    let target = ledgers.find(l => l.name.toUpperCase() === cleanName);
     if (!target) {
-      if (confirm(`Create new customer "${cleanName}"?`)) {
-        target = { id: DB.generateId(), name: cleanName };
-        DB.saveLedger(target);
-      } else return;
+      const newLedger = DB.saveLedger({ id: DB.generateId(), name: cleanName });
+      if (!newLedger) {
+        alert("❌ ERROR: Party fail.");
+        return;
+      }
+      target = newLedger;
+      setLedgers(DB.getLedgers());
     }
 
     const receipt: Receipt = {
       id: isEditMode && id ? id : DB.generateId(),
-      date, ledgerId: target.id, mode, amount: cleanAmount
+      date, 
+      ledgerId: target.id, 
+      mode, 
+      amount: cleanAmount
     };
 
     if (isEditMode ? DB.updateReceipt(receipt) : DB.saveReceipt(receipt)) {
-      if (isEditMode) navigate('/reports');
-      else { 
+      alert("✅ SAVED!");
+      if (isEditMode) {
+        navigate('/reports');
+      } else { 
         setLedgerName(''); 
         setAmount(''); 
-        setDate(new Date().toISOString().split('T')[0]); 
-        alert("Receipt Saved!");
       }
+    } else {
+      alert("❌ FAILED");
     }
   };
 
-  const shareWhatsApp = () => {
-    const amt = parseFloat(amount) || 0;
-    const msg = `*RECEIPT*\nDate: ${date}\nCustomer: ${ledgerName.toUpperCase()}\nAmount: ₹${formatNum(amt)}\nMode: ${mode}\n_Challan Kitab_`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-  };
-
   return (
-    <div className="max-w-md mx-auto mt-4 bg-white border-2 border-black p-6 shadow-xl pb-[70vh]">
-      <div className="bg-black text-white p-4 -mx-6 -mt-6 mb-6">
-        <h2 className="text-2xl font-black uppercase italic tracking-tighter">Receipt Entry</h2>
+    <div className="max-w-md mx-auto bg-white border-2 border-black p-3 md:p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] pb-64 relative pt-0">
+      {/* Tight Header */}
+      <div className="sticky top-0 bg-white z-[100] border-2 border-black p-2 mb-2 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+        <div>
+          <h2 className="text-lg font-black uppercase italic text-indigo-700 leading-none tracking-tighter">Receipt</h2>
+          <div className="text-[7px] font-black uppercase text-gray-500 mt-0.5">Voucher</div>
+        </div>
+        <button 
+          onClick={handleSave} 
+          className="bg-indigo-700 text-white p-2 rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center justify-center"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/>
+          </svg>
+        </button>
       </div>
       
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-[9px] font-black uppercase text-gray-400">Date</label>
+            <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5">Date</label>
             <input 
               type="date" 
               value={date} 
               onChange={e => setDate(e.target.value)} 
-              className="w-full border-b-2 border-black p-2 font-bold text-sm text-black bg-white" 
+              className="w-full border-b-2 border-black py-0.5 font-bold text-xs text-black bg-white outline-none" 
             />
           </div>
           <div>
-            <label className="text-[9px] font-black uppercase text-gray-400">Mode</label>
-            <select value={mode} onChange={e => setMode(e.target.value as any)} className="w-full border-b-2 border-black p-2 font-bold text-sm bg-transparent text-black">
+            <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5">Mode</label>
+            <select 
+              value={mode} 
+              onChange={e => setMode(e.target.value as any)} 
+              className="w-full border-b-2 border-black py-0.5 font-bold text-xs bg-transparent text-black outline-none"
+            >
               <option value="Cash">CASH</option>
               <option value="Bank">BANK</option>
             </select>
@@ -104,41 +135,52 @@ const ReceiptPage: React.FC = () => {
         </div>
 
         <div className="relative">
-          <label className="text-[9px] font-black uppercase text-gray-400">Customer</label>
-          <input 
-            type="text" 
-            autoComplete="off" 
-            value={ledgerName} 
-            onChange={e => { setLedgerName(e.target.value); setShowSuggestions(true); }} 
-            onFocus={handleInputFocus}
-            className="w-full border-b-2 border-black p-2 font-black uppercase text-xl focus:outline-none placeholder:text-gray-100 text-black bg-transparent" 
-            placeholder="NAME..." 
-          />
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-50 w-full bg-white border-2 border-black mt-1 shadow-2xl">
-              {suggestions.map(s => <div key={s.id} onClick={() => { setLedgerName(s.name); setShowSuggestions(false); }} className="p-3 border-b last:border-0 font-black uppercase hover:bg-black hover:text-white cursor-pointer text-black">{s.name}</div>)}
-            </div>
-          )}
+          <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5">Customer Name</label>
+          <div className="relative mt-0.5">
+            <input 
+              id="party-input"
+              type="text" 
+              autoComplete="off" 
+              value={ledgerName} 
+              onFocus={handlePartyFocus}
+              onChange={e => { setLedgerName(e.target.value); setShowSuggestions(true); }} 
+              className="w-full border-b-2 border-black py-0.5 font-black uppercase text-lg focus:outline-none bg-transparent" 
+              placeholder="NAME..." 
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-50 w-full bg-white border-2 border-black mt-1 shadow-2xl max-h-48 overflow-y-auto">
+                {suggestions.map((s: any) => (
+                  <div 
+                    key={s.id} 
+                    onClick={() => { setLedgerName(s.name); setShowSuggestions(false); }} 
+                    className="p-2 border-b last:border-0 font-black uppercase hover:bg-black hover:text-white cursor-pointer text-sm"
+                  >
+                    {s.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div>
-          <label className="text-[9px] font-black uppercase text-gray-400">Amount (₹)</label>
+          <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5">Amount (₹)</label>
           <input 
             type="text" 
             inputMode="decimal"
             value={amount} 
-            onFocus={handleInputFocus}
             onChange={e => setAmount(e.target.value)} 
-            className="w-full border-b-2 border-black p-2 font-black text-4xl focus:outline-none text-black bg-transparent" 
-            placeholder="..." 
+            className="w-full border-b-2 border-black py-0.5 font-black text-4xl focus:outline-none bg-transparent text-green-700 tracking-tighter" 
+            placeholder="0.00" 
           />
         </div>
 
-        <div className="pt-4 flex flex-col gap-2">
-          {/* Swapped order: Save is now first */}
-          <button onClick={handleSave} className="w-full bg-black text-white py-4 font-black uppercase tracking-widest border-b-4 border-gray-700 active:border-b-0 active:translate-y-1">{isEditMode ? 'Update' : 'Save'}</button>
-          <button onClick={shareWhatsApp} className="w-full bg-green-600 text-white py-4 font-black uppercase tracking-widest border-b-4 border-green-800 active:border-b-0 active:translate-y-1">Share WhatsApp</button>
-        </div>
+        <button 
+          onClick={handleSave} 
+          className="w-full bg-black text-white py-4 font-black uppercase tracking-widest text-lg shadow-[4px_4px_0px_0px_rgba(79,70,229,1)] active:shadow-none active:translate-y-1 transition-all mt-4"
+        >
+          {isEditMode ? 'Update' : 'Save Receipt'}
+        </button>
       </div>
     </div>
   );

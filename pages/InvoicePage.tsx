@@ -1,26 +1,45 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useLayoutEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { DB } from '../db';
-import { Ledger, InvoiceItem, Invoice } from '../types';
+import { DB } from '../db.ts';
+import { Ledger, InvoiceItem, Invoice } from '../types.ts';
 
 const InvoicePage: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [serialNo, setSerialNo] = useState(1);
   const [ledgerName, setLedgerName] = useState('');
-  const [items, setItems] = useState<InvoiceItem[]>([
-    { id: DB.generateId(), particulars: '', qty: '', rate: '', amount: 0 }
-  ]);
+  const [items, setItems] = useState<InvoiceItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [nextFocusId, setNextFocusId] = useState<string | null>(null);
 
-  const formatNum = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const forceFocus = (elementId: string) => {
+    setTimeout(() => {
+      const el = document.getElementById(elementId);
+      if (el) {
+        el.focus();
+        if ('select' in el) (el as any).select();
+        if (elementId === 'party-input') {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }, 250);
+  };
 
-  const init = () => {
+  useLayoutEffect(() => {
+    if (nextFocusId) {
+      forceFocus(nextFocusId);
+      setNextFocusId(null);
+    }
+  }, [nextFocusId]);
+
+  useEffect(() => {
     const currentLedgers = DB.getLedgers();
     setLedgers(currentLedgers);
+
     if (id) {
       const existing = DB.getInvoices().find(inv => inv.id === id);
       if (existing) {
@@ -30,8 +49,6 @@ const InvoicePage: React.FC = () => {
         setItems(existing.items);
         const l = currentLedgers.find(led => led.id === existing.ledgerId);
         setLedgerName(l?.name || '');
-      } else { 
-        setSerialNo(DB.getNextSerial()); 
       }
     } else {
       setIsEditMode(false);
@@ -40,27 +57,29 @@ const InvoicePage: React.FC = () => {
       setItems([{ id: DB.generateId(), particulars: '', qty: '', rate: '', amount: 0 }]);
       setDate(new Date().toISOString().split('T')[0]);
     }
+  }, [id]);
+
+  const addItem = () => {
+    const newId = DB.generateId();
+    setItems(prev => [...prev, { id: newId, particulars: '', qty: '', rate: '', amount: 0 }]);
+    setNextFocusId(`particulars-${newId}`);
   };
 
-  useEffect(() => { init(); }, [id]);
+  const removeItem = (itemId: string) => {
+    if (items.length === 1) {
+      setItems([{ id: DB.generateId(), particulars: '', qty: '', rate: '', amount: 0 }]);
+      return;
+    }
+    setItems(prev => prev.filter(i => i.id !== itemId));
+  };
 
   const suggestions = useMemo(() => {
     const q = ledgerName.trim().toLowerCase();
     if (!q) return [];
-    
     return ledgers
       .filter(l => l.name.toLowerCase().includes(q))
-      .sort((a, b) => {
-        const aLow = a.name.toLowerCase();
-        const bLow = b.name.toLowerCase();
-        const aStarts = aLow.startsWith(q);
-        const bStarts = bLow.startsWith(q);
-        
-        if (aStarts && !bStarts) return -1;
-        if (!aStarts && bStarts) return 1;
-        return aLow.localeCompare(bLow);
-      })
-      .slice(0, 8);
+      .filter((v, i, a) => a.findIndex(t => t.name === v.name) === i)
+      .slice(0, 5);
   }, [ledgerName, ledgers]);
 
   const grandTotal = useMemo(() => {
@@ -71,6 +90,19 @@ const InvoicePage: React.FC = () => {
     setItems(prev => prev.map(item => {
       if (item.id === itemId) {
         const updated = { ...item, [field]: value };
+        
+        if (field === 'particulars') {
+          const currentLedger = ledgers.find(l => l.name.toUpperCase() === ledgerName.trim().toUpperCase());
+          if (currentLedger) {
+            const lastRate = DB.getLastRate(currentLedger.id, value);
+            if (lastRate) {
+              updated.rate = lastRate;
+              const q = Number(item.qty) || 0;
+              updated.amount = q * lastRate;
+            }
+          }
+        }
+
         if (field === 'qty' || field === 'rate') {
           const q = field === 'qty' ? value : String(item.qty);
           const r = field === 'rate' ? value : String(item.rate);
@@ -82,176 +114,153 @@ const InvoicePage: React.FC = () => {
     }));
   };
 
-  const addItem = () => {
-    setItems(prev => [...prev, { id: DB.generateId(), particulars: '', qty: '', rate: '', amount: 0 }]);
+  const handlePartyFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    const el = e.target;
+    setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 250);
   };
-  
-  const removeItem = (itemId: string) => {
-    if (items.length > 1) {
-      setItems(prev => prev.filter(i => i.id !== itemId));
-    } else {
-      setItems([{ id: DB.generateId(), particulars: '', qty: '', rate: '', amount: 0 }]);
+
+  const handleKeyDown = (e: React.KeyboardEvent, type: string, itemId?: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (type === 'name') {
+        setShowSuggestions(false);
+        if (items.length > 0) setNextFocusId(`particulars-${items[0].id}`);
+      } else if (type === 'particulars' && itemId) {
+        setNextFocusId(`qty-${itemId}`);
+      } else if (type === 'qty' && itemId) {
+        setNextFocusId(`rate-${itemId}`);
+      } else if (type === 'rate' && itemId) {
+        const idx = items.findIndex(i => i.id === itemId);
+        if (idx === items.length - 1) {
+          if (items[idx].particulars.trim()) addItem();
+        } else {
+          setNextFocusId(`particulars-${items[idx + 1].id}`);
+        }
+      }
     }
   };
 
   const handleSave = () => {
-    const name = ledgerName.trim();
-    
-    // 1. Validate Customer Name
+    const name = ledgerName.trim().toUpperCase();
     if (!name) {
-      alert("⚠️ CUSTOMER NAME MISSING\nPlease enter a name before saving.");
-      const input = document.getElementById('customer-name-input');
-      input?.focus();
-      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      alert("⚠️ ENTER PARTY NAME");
+      forceFocus('party-input');
       return;
     }
 
-    // 2. Row-by-Row Validation (The "Incomplete Entry" Fix)
+    const cleanRows: InvoiceItem[] = [];
     for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const p = item.particulars.trim();
-      const qVal = String(item.qty).trim();
-      const rVal = String(item.rate).trim();
-      
-      const q = parseFloat(qVal) || 0;
-      const r = parseFloat(rVal) || 0;
+      const row = items[i];
+      const p = row.particulars.trim();
+      const q = parseFloat(String(row.qty));
+      const r = parseFloat(String(row.rate));
+      const hasContent = p !== '' || (!isNaN(q) && q !== 0) || (!isNaN(r) && r !== 0);
 
-      // If anything is typed in the row, the whole row must be finished
-      const isPartiallyFilled = p !== '' || qVal !== '' || rVal !== '' || q !== 0 || r !== 0;
-
-      if (isPartiallyFilled) {
-        if (p === '') {
-          alert(`⚠️ DESCRIPTION MISSING (Row ${i + 1})`);
-          const el = document.getElementById(`particulars-${item.id}`);
-          el?.focus();
-          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (hasContent) {
+        if (!p) {
+          alert(`⚠️ MISSING PARTICULARS (ROW ${i + 1})`);
+          forceFocus(`particulars-${row.id}`);
           return;
         }
-        if (qVal === '' || q === 0) {
-          alert(`⚠️ QUANTITY MISSING (Row ${i + 1})`);
-          const el = document.getElementById(`qty-${item.id}`);
-          el?.focus();
-          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (isNaN(q) || q <= 0) {
+          alert(`⚠️ INVALID QTY (ROW ${i + 1})`);
+          forceFocus(`qty-${row.id}`);
           return;
         }
-        if (rVal === '' || r === 0) {
-          alert(`⚠️ RATE MISSING (Row ${i + 1})`);
-          const el = document.getElementById(`rate-${item.id}`);
-          el?.focus();
-          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (isNaN(r) || r <= 0) {
+          alert(`⚠️ INVALID RATE (ROW ${i + 1})`);
+          forceFocus(`rate-${row.id}`);
           return;
         }
+        cleanRows.push({ ...row, particulars: p, qty: q, rate: r, amount: q * r });
       }
     }
 
-    // Only keep rows that are fully complete
-    const validItems = items.filter(i => i.particulars.trim() !== '' && (parseFloat(String(i.qty)) > 0) && (parseFloat(String(i.rate)) > 0));
-    
-    if (!validItems.length) {
-      alert("⚠️ NO COMPLETED ROWS\nPlease add at least one full item.");
+    if (cleanRows.length === 0) {
+      alert("⚠️ ADD AT LEAST ONE ITEM");
+      forceFocus(`particulars-${items[0].id}`);
       return;
     }
 
-    const cleanedItems = validItems.map(item => ({
-      ...item,
-      qty: parseFloat(String(item.qty)),
-      rate: parseFloat(String(item.rate))
-    }));
-
-    let ledger = ledgers.find(l => l.name.toLowerCase() === name.toLowerCase());
+    let ledger = ledgers.find(l => l.name.toUpperCase() === name);
     if (!ledger) {
-      ledger = { id: DB.generateId(), name };
-      DB.saveLedger(ledger);
+      const newLedger = DB.saveLedger({ id: DB.generateId(), name });
+      if (!newLedger) {
+        alert("❌ ERROR: Party record fail.");
+        return;
+      }
+      ledger = newLedger;
+      setLedgers(DB.getLedgers());
     }
 
     const invoice: Invoice = {
       id: isEditMode && id ? id : DB.generateId(),
-      serialNo, date, ledgerId: ledger.id, items: cleanedItems, grandTotal
+      serialNo,
+      date,
+      ledgerId: ledger.id,
+      items: cleanRows,
+      grandTotal: cleanRows.reduce((sum, row) => sum + row.amount, 0)
     };
 
-    if (isEditMode ? DB.updateInvoice(invoice) : DB.saveInvoice(invoice)) {
+    const success = isEditMode ? DB.updateInvoice(invoice) : DB.saveInvoice(invoice);
+    
+    if (success) {
       if (isEditMode) {
+        alert("✅ UPDATED!");
         navigate('/reports');
       } else {
-        alert("✅ CHALLAN SAVED!");
-        // Clear for next entry
         setLedgerName('');
         setItems([{ id: DB.generateId(), particulars: '', qty: '', rate: '', amount: 0 }]);
-        setDate(new Date().toISOString().split('T')[0]);
         setSerialNo(DB.getNextSerial());
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        forceFocus('party-input');
+        alert("✅ SAVED!");
       }
+    } else {
+      alert("❌ STORAGE FULL?");
     }
   };
 
-  const shareWhatsApp = () => {
-    let msg = `*CHALLAN #${String(serialNo).padStart(2, '0')}*\nDate: ${date}\nParty: ${ledgerName.toUpperCase()}\n------------------\n`;
-    items.forEach((item, idx) => {
-      if (item.particulars) {
-        msg += `${idx + 1}. ${item.particulars.toUpperCase()}\n   ${item.qty} x ${item.rate} = ₹${formatNum(item.amount)}\n`;
-      }
-    });
-    msg += `------------------\n*TOTAL: ₹${formatNum(grandTotal)}*\n_Challan Kitab_`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-  };
+  const formatNum = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
   return (
-    <div className="bg-white border-2 border-black p-3 md:p-8 invoice-font w-full mx-auto pb-[60vh] text-black relative">
-      
-      {/* STICKY HEADER - Always visible while scrolling */}
-      <div className="sticky top-0 bg-white/95 backdrop-blur-md z-[150] border-b-2 border-black pb-2 mb-6 flex justify-between items-start pt-2 px-1 sticky-header">
-        <div className="flex flex-col">
-          <h1 className="text-xl font-black uppercase italic tracking-tighter text-indigo-700 leading-none">Challan</h1>
-          <div className="flex items-center gap-1 mt-1">
-             <span className="text-[8px] font-black uppercase text-gray-500">Date:</span>
-             <input 
-               type="date" 
-               value={date} 
-               onChange={e => setDate(e.target.value)} 
-               className="text-[10px] font-bold outline-none text-black bg-transparent" 
-             />
-          </div>
+    <div className="bg-white border-2 border-black p-2 md:p-8 invoice-font w-full mx-auto pb-64 text-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative pt-0">
+      {/* Sticky Header - Minimal top space */}
+      <div className="sticky top-0 bg-white z-[100] border-2 border-black p-2 mb-2 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+        <div>
+          <h1 className="text-lg font-black uppercase italic text-indigo-700 leading-none tracking-tighter">Challan</h1>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="text-[9px] font-bold outline-none mt-0.5 bg-transparent block" />
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           <div className="text-right">
-            <div className="text-[8px] font-black uppercase text-gray-400">No.</div>
-            <div className="text-lg font-black text-black leading-none mt-1">
-              #{String(serialNo).padStart(2, '0')}
-            </div>
+            <div className="text-[7px] font-black text-gray-500 uppercase leading-none">Serial</div>
+            <div className="text-base font-black leading-none">#{String(serialNo).padStart(2, '0')}</div>
           </div>
-          {/* THE TICK BUTTON - High visibility and immediate save */}
-          <button 
-            type="button"
-            onClick={handleSave}
-            className="bg-indigo-700 text-white w-12 h-12 rounded shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 flex items-center justify-center transition-all"
-            aria-label="Save Entry"
-          >
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
-            </svg>
+          <button type="button" onClick={handleSave} className="bg-indigo-700 text-white p-2 rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center justify-center">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/></svg>
           </button>
         </div>
       </div>
 
-      {/* Party Input */}
-      <div className="mb-8">
-        <div className="inline-block bg-black px-2 py-0.5 mb-1">
-          <label className="text-[8px] font-black uppercase text-white tracking-widest">Party Name</label>
-        </div>
-        <div className="relative">
+      <div className="mb-2 flex flex-col items-center">
+        <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5 mb-1">Party Name</label>
+        <div className="relative w-full">
           <input 
-            id="customer-name-input"
-            autoComplete="off" 
+            id="party-input"
             type="text" 
-            value={ledgerName} 
-            onChange={e => { setLedgerName(e.target.value); setShowSuggestions(true); }} 
-            className="w-full border-b-2 border-black py-2 text-xl font-black uppercase focus:outline-none bg-transparent text-black" 
-            placeholder="TYPE NAME..." 
+            autoComplete="off"
+            value={ledgerName}
+            onFocus={handlePartyFocus}
+            onKeyDown={(e) => handleKeyDown(e, 'name')}
+            onChange={e => { setLedgerName(e.target.value); setShowSuggestions(true); }}
+            className="w-full border-b-2 border-black py-0.5 text-lg font-black uppercase focus:outline-none bg-transparent" 
+            placeholder="TYPE NAME..."
           />
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-[200] w-full bg-white border-2 border-black mt-1 shadow-2xl max-h-48 overflow-y-auto">
+            <div className="absolute z-50 w-full bg-white border-2 border-black mt-1 shadow-2xl max-h-48 overflow-y-auto">
               {suggestions.map(s => (
-                <div key={s.id} onClick={() => { setLedgerName(s.name); setShowSuggestions(false); }} className="p-4 border-b last:border-0 font-black uppercase hover:bg-black hover:text-white cursor-pointer text-black transition-colors">
+                <div key={s.id} onClick={() => { setLedgerName(s.name); setShowSuggestions(false); }} className="p-2 border-b last:border-0 font-black uppercase hover:bg-black hover:text-white cursor-pointer text-sm">
                   {s.name}
                 </div>
               ))}
@@ -260,91 +269,84 @@ const InvoicePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Column Titles */}
-      <div className="grid grid-cols-12 gap-1 text-[8px] font-black uppercase text-gray-400 mb-3 px-1">
-        <div className="col-span-5">Particulars</div>
-        <div className="col-span-2 text-center">Qty</div>
-        <div className="col-span-2 text-center">Rate</div>
-        <div className="col-span-3 text-right">Amount</div>
-      </div>
+      <div className="space-y-1">
+        <div className="grid grid-cols-12 gap-1 text-[7px] font-black uppercase text-black border-b border-black pb-0.5">
+          <div className="col-span-4">Particulars</div>
+          <div className="col-span-2 text-center">Qty</div>
+          <div className="col-span-3 text-center">Rate</div>
+          <div className="col-span-2 text-right">Total</div>
+          <div className="col-span-1"></div>
+        </div>
 
-      {/* Row Items */}
-      <div className="space-y-8">
-        {items.map((item, idx) => (
-          <div key={item.id} className="grid grid-cols-12 gap-2 items-start border-b border-gray-100 pb-6 relative group">
-            <div className="col-span-5">
-              <textarea 
-                id={`particulars-${item.id}`}
-                rows={1}
+        {items.map((item) => (
+          <div key={item.id} className="grid grid-cols-12 gap-1 items-center border-b border-gray-100 pb-1">
+            <div className="col-span-4">
+              <input 
+                id={`particulars-${item.id}`} 
+                type="text" 
                 value={item.particulars} 
-                onChange={e => {
-                  handleItemChange(item.id, 'particulars', e.target.value);
-                  e.target.style.height = 'auto';
-                  e.target.style.height = e.target.scrollHeight + 'px';
-                }} 
-                className="w-full font-bold uppercase text-[13px] outline-none bg-transparent resize-none leading-tight text-black border-b-2 border-black/10 focus:border-black transition-all" 
-                placeholder="DESCRIPTION..."
+                onKeyDown={(e) => handleKeyDown(e, 'particulars', item.id)} 
+                onChange={e => handleItemChange(item.id, 'particulars', e.target.value)} 
+                className="w-full font-bold uppercase text-[13px] outline-none bg-transparent" 
+                placeholder="..." 
               />
             </div>
             <div className="col-span-2">
               <input 
-                id={`qty-${item.id}`}
+                id={`qty-${item.id}`} 
                 type="text" 
-                inputMode="decimal"
+                inputMode="decimal" 
                 value={item.qty} 
+                onKeyDown={(e) => handleKeyDown(e, 'qty', item.id)} 
                 onChange={e => handleItemChange(item.id, 'qty', e.target.value)} 
-                className="w-full font-black text-[15px] py-1 text-center bg-transparent border-b-2 border-black focus:border-indigo-600 text-black outline-none transition-all" 
-                placeholder="0"
+                className="w-full font-black text-[13px] text-center bg-transparent border-b border-transparent focus:border-black outline-none" 
               />
             </div>
-            <div className="col-span-2">
+            <div className="col-span-3">
               <input 
-                id={`rate-${item.id}`}
+                id={`rate-${item.id}`} 
                 type="text" 
-                inputMode="decimal"
+                inputMode="decimal" 
                 value={item.rate} 
+                onKeyDown={(e) => handleKeyDown(e, 'rate', item.id)} 
                 onChange={e => handleItemChange(item.id, 'rate', e.target.value)} 
-                className="w-full font-black text-[15px] py-1 text-center bg-transparent border-b-2 border-black focus:border-indigo-600 text-black outline-none transition-all" 
-                placeholder="0"
+                className="w-full font-black text-[13px] text-center bg-transparent border-b border-transparent focus:border-black outline-none" 
               />
             </div>
-            <div className="col-span-3 text-right flex items-center justify-end gap-1 pt-2">
-              <span className="text-[13px] font-black whitespace-nowrap text-black">₹{formatNum(item.amount)}</span>
-              {items.length > 1 && (
-                <button onClick={() => removeItem(item.id)} className="text-red-500 font-bold text-2xl px-2 ml-1 leading-none hover:bg-red-50 rounded">×</button>
-              )}
+            <div className="col-span-2 text-right font-black text-[13px] truncate">
+              {formatNum(item.amount)}
+            </div>
+            <div className="col-span-1 text-right">
+              <button type="button" onClick={() => removeItem(item.id)} className="text-black hover:text-red-600 transition-colors p-1">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Add Row & Total Section */}
-      <div className="mt-10 flex justify-between items-center bg-gray-50 p-4 border-2 border-dashed border-gray-300">
+      {/* Adjusted Add Row button: Small box that rests on the line and is right-aligned */}
+      <div className="mt-3 flex justify-end -mb-[2px] relative z-10">
         <button 
+          type="button" 
           onClick={addItem} 
-          className="bg-white border-2 border-black px-6 py-3 font-black uppercase text-[12px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all"
+          className="w-auto px-4 py-1.5 border-2 border-dashed border-black bg-white font-black uppercase text-[8px] hover:bg-gray-50 tracking-widest"
         >
-          + Add New Row
+          + Add Row
         </button>
+      </div>
+
+      <div className="flex justify-between items-end border-t-2 border-black pt-1">
+        <div className="text-[7px] font-black uppercase text-gray-500 tracking-tighter italic">Official</div>
         <div className="text-right">
-          <div className="text-[9px] font-black text-gray-400 uppercase leading-none tracking-widest">Total Amount</div>
-          <div className="text-3xl font-black text-black">₹{formatNum(grandTotal)}</div>
+          <div className="text-[9px] font-black uppercase opacity-60">Grand Total</div>
+          <div className="text-3xl font-black">₹{formatNum(grandTotal)}</div>
         </div>
       </div>
 
-      {/* Main Action Buttons */}
-      <div className="mt-16 space-y-4">
-        <button 
-          onClick={handleSave} 
-          className="w-full bg-indigo-700 text-white py-5 font-black uppercase tracking-widest text-lg border-b-8 border-indigo-900 active:border-b-0 active:translate-y-2 transition-all"
-        >
-          {isEditMode ? 'Update Record' : 'Save Entry & Reset'}
-        </button>
-        <button 
-          onClick={shareWhatsApp} 
-          className="w-full bg-green-600 text-white py-5 font-black uppercase tracking-widest text-lg border-b-8 border-green-800 active:border-b-0 active:translate-y-2 flex items-center justify-center gap-2 transition-all"
-        >
-          Share on WhatsApp
+      <div className="mt-6">
+        <button type="button" onClick={handleSave} className="w-full bg-indigo-700 text-white py-4 font-black uppercase tracking-widest text-lg shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all">
+          {isEditMode ? 'Update' : 'Save Challan'}
         </button>
       </div>
     </div>
