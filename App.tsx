@@ -1,9 +1,22 @@
-import React from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import InvoicePage from './pages/InvoicePage';
 import ReceiptPage from './pages/ReceiptPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
+
+// Custom Modal Context for templated alerts
+interface ModalContextType {
+  showAlert: (message: string) => void;
+}
+
+const ModalContext = createContext<ModalContextType | undefined>(undefined);
+
+export const useCustomModal = () => {
+  const context = useContext(ModalContext);
+  if (!context) throw new Error("useCustomModal must be used within ModalProvider");
+  return context;
+};
 
 const NavigationMenu = () => {
   const location = useLocation();
@@ -22,7 +35,7 @@ const NavigationMenu = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-black flex justify-around items-center z-[500] md:static md:border-t-0 md:bg-transparent md:mb-8">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-black flex justify-around items-center z-[400] md:static md:border-t-0 md:bg-transparent md:mb-8">
       {navItems.map(item => (
         <Link 
           key={item.path} 
@@ -39,22 +52,47 @@ const NavigationMenu = () => {
 };
 
 const App = () => {
+  const [modalMsg, setModalMsg] = useState<string | null>(null);
+
+  const showAlert = useCallback((msg: string) => {
+    setModalMsg(msg);
+  }, []);
+
   return (
-    <HashRouter>
-      <div className="min-h-screen flex flex-col bg-gray-50 overflow-x-hidden w-full">
-        <NavigationMenu />
-        <main className="flex-1 max-w-5xl mx-auto w-full p-2 md:p-8 pb-20 md:pb-8">
-          <Routes>
-            <Route path="/" element={<InvoicePage />} />
-            <Route path="/edit-invoice/:id" element={<InvoicePage />} />
-            <Route path="/receipt" element={<ReceiptPage />} />
-            <Route path="/edit-receipt/:id" element={<ReceiptPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Routes>
-        </main>
-      </div>
-    </HashRouter>
+    <ModalContext.Provider value={{ showAlert }}>
+      <HashRouter>
+        <div className="min-h-screen flex flex-col bg-gray-50 overflow-x-hidden w-full">
+          <NavigationMenu />
+          <main className="flex-1 max-w-5xl mx-auto w-full p-2 md:p-8 pb-20 md:pb-8">
+            <Routes>
+              <Route path="/" element={<InvoicePage />} />
+              <Route path="/edit-invoice/:id" element={<InvoicePage />} />
+              <Route path="/receipt" element={<ReceiptPage />} />
+              <Route path="/edit-receipt/:id" element={<ReceiptPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+            </Routes>
+          </main>
+        </div>
+
+        {/* Custom Application Templated Modal */}
+        {modalMsg && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] max-w-sm w-full animate-in zoom-in duration-200">
+              <div className="text-center">
+                <div className="text-lg font-black uppercase mb-6 text-black tracking-tight">{modalMsg}</div>
+                <button 
+                  onClick={() => setModalMsg(null)}
+                  className="w-full bg-indigo-700 text-white py-3 font-black uppercase tracking-widest text-sm shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </HashRouter>
+    </ModalContext.Provider>
   );
 };
 
