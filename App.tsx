@@ -1,11 +1,10 @@
 import React from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import InvoicePage from './pages/InvoicePage.tsx';
-import ReceiptPage from './pages/ReceiptPage.tsx';
-import ReportsPage from './pages/ReportsPage.tsx';
-import SettingsPage from './pages/SettingsPage.tsx';
+import InvoicePage from './pages/InvoicePage';
+import ReceiptPage from './pages/ReceiptPage';
+import ReportsPage from './pages/ReportsPage';
+import SettingsPage from './pages/SettingsPage';
 
-// The UI component for Navigation - Must be inside a Router context
 const NavigationMenu = () => {
   const location = useLocation();
   
