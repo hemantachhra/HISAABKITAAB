@@ -1,11 +1,10 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import InvoicePage from './pages/InvoicePage';
 import ReceiptPage from './pages/ReceiptPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
 
-// Custom Modal Context for templated alerts
 interface ModalContextType {
   showAlert: (message: string) => void;
 }
@@ -58,6 +57,15 @@ const App = () => {
     setModalMsg(msg);
   }, []);
 
+  useEffect(() => {
+    if (modalMsg) {
+      const timer = setTimeout(() => {
+        setModalMsg(null);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [modalMsg]);
+
   return (
     <ModalContext.Provider value={{ showAlert }}>
       <HashRouter>
@@ -75,23 +83,24 @@ const App = () => {
           </main>
         </div>
 
-        {/* Custom Application Templated Modal */}
         {modalMsg && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white border-4 border-black p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] max-w-sm w-full animate-in zoom-in duration-200">
-              <div className="text-center">
-                <div className="text-lg font-black uppercase mb-6 text-black tracking-tight">{modalMsg}</div>
-                <button 
-                  onClick={() => setModalMsg(null)}
-                  className="w-full bg-indigo-700 text-white py-3 font-black uppercase tracking-widest text-sm shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
-                >
-                  OK
-                </button>
-              </div>
+          <div className="fixed bottom-24 left-0 right-0 z-[1000] flex items-center justify-center p-4 pointer-events-none">
+            <div className="bg-white border-4 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] max-w-xs w-full text-center animate-bounce-in">
+              <div className="text-sm font-black uppercase leading-tight tracking-tight text-black">{modalMsg}</div>
             </div>
           </div>
         )}
       </HashRouter>
+      <style>{`
+        @keyframes bounceIn {
+          0% { transform: scale(0.9); opacity: 0; }
+          70% { transform: scale(1.05); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-bounce-in {
+          animation: bounceIn 0.3s ease-out forwards;
+        }
+      `}</style>
     </ModalContext.Provider>
   );
 };
