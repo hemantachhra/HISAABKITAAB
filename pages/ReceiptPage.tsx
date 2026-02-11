@@ -17,8 +17,12 @@ const ReceiptPage: React.FC = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
 
-  useEffect(() => {
+  const refreshLedgers = () => {
     setLedgers(DB.getLedgers());
+  };
+
+  useEffect(() => {
+    refreshLedgers();
     if (id) {
       const existing = DB.getReceipts().find(r => r.id === id);
       if (existing) {
@@ -26,7 +30,8 @@ const ReceiptPage: React.FC = () => {
         setDate(existing.date);
         setAmount(String(existing.amount));
         setMode(existing.mode);
-        setLedgerName(DB.getLedgers().find(l => l.id === existing.ledgerId)?.name || '');
+        const currentLedgers = DB.getLedgers();
+        setLedgerName(currentLedgers.find(l => l.id === existing.ledgerId)?.name || '');
       }
     }
   }, [id]);
@@ -34,46 +39,20 @@ const ReceiptPage: React.FC = () => {
   const suggestions = useMemo(() => {
     const q = ledgerName.trim().toLowerCase();
     if (!q) return [];
-    const uniqueMap = new Map();
-    ledgers.forEach(l => {
-      const name = l.name.toUpperCase();
-      if (!uniqueMap.has(name)) uniqueMap.set(name, l);
-    });
-    return Array.from(uniqueMap.values()).filter((l: any) => l.name.toLowerCase().includes(q)).slice(0, 10);
+    return ledgers.filter(l => l.name.toLowerCase().includes(q)).slice(0, 10);
   }, [ledgerName, ledgers]);
-
-  const handlePartyFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-    const el = e.target;
-    setTimeout(() => {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 250);
-  };
 
   const handleSave = () => {
     const cleanName = ledgerName.trim().toUpperCase();
     const cleanAmount = parseFloat(amount);
-
-    if (!cleanName) {
-      showAlert("⚠️ ENTER PARTY NAME");
+    if (!cleanName || isNaN(cleanAmount) || cleanAmount <= 0) {
+      showAlert("⚠️ ENTER VALID DETAILS");
       return;
     }
-
-    if (isNaN(cleanAmount) || cleanAmount <= 0) {
-      showAlert("⚠️ INVALID AMOUNT");
-      return;
-    }
-
     let target = ledgers.find(l => l.name.toUpperCase() === cleanName);
     if (!target) {
-      const newLedger = DB.saveLedger({ id: DB.generateId(), name: cleanName });
-      if (!newLedger) {
-        showAlert("❌ ERROR: Party fail.");
-        return;
-      }
-      target = newLedger;
-      setLedgers(DB.getLedgers());
+      target = DB.saveLedger({ id: DB.generateId(), name: cleanName })!;
     }
-
     const receipt: Receipt = {
       id: isEditMode && id ? id : DB.generateId(),
       date, 
@@ -81,55 +60,33 @@ const ReceiptPage: React.FC = () => {
       mode, 
       amount: cleanAmount
     };
-
     if (isEditMode ? DB.updateReceipt(receipt) : DB.saveReceipt(receipt)) {
       showAlert("✅ SAVED!");
-      if (isEditMode) {
-        navigate('/reports');
-      } else { 
-        setLedgerName(''); 
-        setAmount(''); 
-      }
-    } else {
-      showAlert("❌ FAILED");
+      if (isEditMode) navigate('/reports');
+      else { setLedgerName(''); setAmount(''); }
     }
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white border-2 border-black p-3 md:p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] pb-64 relative pt-0">
-      <div className="sticky top-0 bg-white z-[100] border-2 border-black p-2 mb-2 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+    <div className="max-w-md mx-auto bg-white border-2 border-black p-3 md:p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] pb-80 relative pt-0 mt-[-4px]">
+      <div className="sticky top-0 bg-white z-[100] border-2 border-black p-1 mb-1.5 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
         <div>
-          <h2 className="text-lg font-black uppercase italic text-indigo-700 leading-none tracking-tighter">Receipt</h2>
-          <div className="text-[7px] font-black uppercase text-gray-500 mt-0.5">Voucher</div>
+          <h2 className="text-base font-black uppercase italic text-indigo-700 leading-none">Receipt</h2>
         </div>
-        <button 
-          onClick={handleSave} 
-          className="bg-indigo-700 text-white p-2 rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all flex items-center justify-center"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/>
-          </svg>
+        <button onClick={handleSave} className="bg-indigo-700 text-white p-1.5 rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/></svg>
         </button>
       </div>
       
-      <div className="space-y-3">
+      <div className="space-y-2">
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5">Date</label>
-            <input 
-              type="date" 
-              value={date} 
-              onChange={e => setDate(e.target.value)} 
-              className="w-full border-b-2 border-black py-0.5 font-bold text-xs text-black bg-white outline-none" 
-            />
+            <label className="text-[7px] font-black uppercase text-black mb-1 block">Date</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full border-b-2 border-black py-0.5 font-bold text-xs outline-none bg-transparent" />
           </div>
           <div>
-            <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5">Mode</label>
-            <select 
-              value={mode} 
-              onChange={e => setMode(e.target.value as any)} 
-              className="w-full border-b-2 border-black py-0.5 font-bold text-xs bg-transparent text-black outline-none"
-            >
+            <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5 inline-block">Mode</label>
+            <select value={mode} onChange={e => setMode(e.target.value as any)} className="w-full border-b-2 border-black py-0.5 font-bold text-xs bg-transparent outline-none">
               <option value="Cash">CASH</option>
               <option value="Bank">BANK</option>
             </select>
@@ -137,50 +94,37 @@ const ReceiptPage: React.FC = () => {
         </div>
 
         <div className="relative">
-          <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5">Customer Name</label>
-          <div className="relative mt-0.5">
-            <input 
-              id="party-input"
-              type="text" 
-              autoComplete="off" 
-              value={ledgerName} 
-              onFocus={handlePartyFocus}
-              onChange={e => { setLedgerName(e.target.value); setShowSuggestions(true); }} 
-              className="w-full border-b-2 border-black py-0.5 font-black uppercase text-lg focus:outline-none bg-transparent" 
-              placeholder="NAME..." 
-            />
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute z-50 w-full bg-white border-2 border-black mt-1 shadow-2xl max-h-48 overflow-y-auto">
-                {suggestions.map((s: any) => (
-                  <div 
-                    key={s.id} 
-                    onClick={() => { setLedgerName(s.name); setShowSuggestions(false); }} 
-                    className="p-2 border-b last:border-0 font-black uppercase hover:bg-black hover:text-white cursor-pointer text-sm"
-                  >
-                    {s.name}
-                  </div>
-                ))}
-              </div>
-            )}
+          <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5 mb-1 mx-auto block w-max">Client Name</label>
+          <div className="relative w-full flex justify-center">
+            <div className="relative w-full md:w-1/2">
+              <input 
+                type="text" 
+                autoComplete="off" 
+                value={ledgerName} 
+                onFocus={() => { refreshLedgers(); setShowSuggestions(true); }}
+                onChange={e => { setLedgerName(e.target.value); setShowSuggestions(true); }} 
+                className="w-full border-b-2 border-black py-0.5 font-black uppercase text-lg outline-none bg-transparent text-center" 
+                placeholder="NAME..." 
+              />
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute z-[200] left-1/2 -translate-x-1/2 w-max min-w-[180px] max-w-full bg-indigo-50 border-2 border-black mt-1 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                  {suggestions.map(s => (
+                    <div key={s.id} onClick={() => { setLedgerName(s.name); setShowSuggestions(false); }} className="p-3 border-b last:border-0 font-black uppercase hover:bg-black hover:text-white cursor-pointer text-sm truncate">
+                      {s.name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         <div>
-          <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5">Amount (₹)</label>
-          <input 
-            type="text" 
-            inputMode="decimal"
-            value={amount} 
-            onChange={e => setAmount(e.target.value)} 
-            className="w-full border-b-2 border-black py-0.5 font-black text-4xl focus:outline-none bg-transparent text-green-700 tracking-tighter" 
-            placeholder="0.00" 
-          />
+          <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5 block w-max mx-auto mb-1">Amount (₹)</label>
+          <input type="text" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} className="w-full border-b-2 border-black py-0.5 font-black text-4xl outline-none bg-transparent text-green-700 tracking-tighter text-center" placeholder="0.00" />
         </div>
 
-        <button 
-          onClick={handleSave} 
-          className="w-full bg-black text-white py-4 font-black uppercase tracking-widest text-lg shadow-[4px_4px_0px_0px_rgba(79,70,229,1)] active:shadow-none active:translate-y-1 transition-all mt-4"
-        >
+        <button onClick={handleSave} className="w-full bg-black text-white py-3 font-black uppercase tracking-widest text-lg shadow-[4px_4px_0px_0px_rgba(79,70,229,1)] active:shadow-none active:translate-y-1 transition-all mt-1">
           {isEditMode ? 'Update' : 'Save Receipt'}
         </button>
       </div>

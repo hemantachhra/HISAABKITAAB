@@ -70,7 +70,7 @@ const SettingsPage: React.FC = () => {
           </div>
           <div className="border-2 border-black p-3 bg-orange-50">
             <div className="text-2xl font-black">{stats.ledgers}</div>
-            <div className="text-[8px] font-bold uppercase text-gray-500 tracking-tighter">Parties</div>
+            <div className="text-[8px] font-bold uppercase text-gray-500 tracking-tighter">Clients</div>
           </div>
         </div>
       </div>

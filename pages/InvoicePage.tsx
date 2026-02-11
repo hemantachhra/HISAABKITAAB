@@ -25,7 +25,7 @@ const InvoicePage: React.FC = () => {
         el.focus();
         if ('select' in el) (el as any).select();
       }
-    }, 250);
+    }, 150);
   };
 
   useLayoutEffect(() => {
@@ -35,9 +35,12 @@ const InvoicePage: React.FC = () => {
     }
   }, [nextFocusId]);
 
+  const refreshLedgers = () => {
+    setLedgers(DB.getLedgers());
+  };
+
   useEffect(() => {
-    const currentLedgers = DB.getLedgers();
-    setLedgers(currentLedgers);
+    refreshLedgers();
 
     if (id) {
       const existing = DB.getInvoices().find(inv => inv.id === id);
@@ -46,6 +49,7 @@ const InvoicePage: React.FC = () => {
         setDate(existing.date);
         setSerialNo(existing.serialNo);
         setItems(existing.items);
+        const currentLedgers = DB.getLedgers();
         const l = currentLedgers.find(led => led.id === existing.ledgerId);
         setLedgerName(l?.name || '');
       }
@@ -137,7 +141,7 @@ const InvoicePage: React.FC = () => {
     const finalSerial = Number(serialNo);
     
     if (!name) {
-      showAlert("⚠️ ENTER PARTY NAME");
+      showAlert("⚠️ ENTER CLIENT NAME");
       return;
     }
     if (isNaN(finalSerial) || finalSerial <= 0) {
@@ -186,26 +190,56 @@ const InvoicePage: React.FC = () => {
     }
   };
 
+  const handleWhatsApp = () => {
+    if (!ledgerName || items.length === 0) return;
+    const cleanDate = date.split('-').reverse().join('-');
+    let msg = `*CHALLAN KITAB*\n`;
+    msg += `--------------------------\n`;
+    msg += `*Challan No:* ${serialNo}\n`;
+    msg += `*Date:* ${cleanDate}\n`;
+    msg += `*Client:* ${ledgerName.toUpperCase()}\n`;
+    msg += `--------------------------\n`;
+    items.forEach(item => {
+      if (item.particulars) {
+        msg += `• ${item.particulars}\n  ${item.qty} x ${item.rate} = *₹${formatNum(item.amount)}*\n`;
+      }
+    });
+    msg += `--------------------------\n`;
+    msg += `*GRAND TOTAL: ₹${formatNum(grandTotal)} LENA*\n`;
+    msg += `--------------------------\n`;
+    msg += `Thank you!`;
+
+    const encoded = encodeURIComponent(msg);
+    window.open(`https://wa.me/?text=${encoded}`, '_blank');
+  };
+
   const formatNum = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
+  const GRID_CLASS = "grid grid-cols-[1fr_90px_90px_105px_32px] gap-x-1.5";
+
   return (
-    <div className="bg-white border-2 border-black p-2 md:p-8 invoice-font w-full mx-auto pb-64 text-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative pt-0">
-      <div className="sticky top-0 bg-white z-[100] border-2 border-black p-2 mb-2 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+    <div className="bg-white border-2 border-black p-2 md:p-6 invoice-font w-full mx-auto pb-72 text-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative pt-0 mt-[-2px]">
+      <div className="sticky top-0 bg-white z-[100] border-2 border-black p-2 mb-1.5 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
         <div>
-          <h1 className="text-lg font-black uppercase italic text-indigo-700 leading-none tracking-tighter">Challan</h1>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="text-[9px] font-bold outline-none mt-0.5 bg-transparent block" />
+          <h1 className="text-sm font-black uppercase italic text-indigo-700 leading-none tracking-tighter">Challan</h1>
+          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="text-[10px] font-bold outline-none mt-1 bg-transparent block" />
         </div>
         <div className="flex items-center gap-2">
+          <button type="button" onClick={handleWhatsApp} title="Share via WhatsApp" className="bg-green-600 text-white p-2 rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+            </svg>
+          </button>
           <div className="text-right">
-            <div className="text-[7px] font-black text-gray-500 uppercase leading-none">Serial</div>
+            <div className="text-[6px] font-black text-gray-500 uppercase leading-none">Serial</div>
             <div className="flex items-center justify-end">
-              <span className="text-base font-black leading-none mr-0.5">#</span>
+              <span className="text-xs font-black leading-none mr-0.5">#</span>
               <input 
                 type="text" 
                 inputMode="numeric"
                 value={serialNo} 
                 onChange={e => setSerialNo(e.target.value)}
-                className="text-base font-black leading-none w-12 text-right bg-transparent border-b border-dashed border-black focus:border-black outline-none"
+                className="text-xs font-black leading-none w-8 text-right bg-transparent border-b border-dashed border-black focus:border-black outline-none"
               />
             </div>
           </div>
@@ -215,73 +249,113 @@ const InvoicePage: React.FC = () => {
         </div>
       </div>
 
-      <div className="mb-2 flex flex-col items-center">
-        <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5 mb-1">Party Name</label>
-        <div className="relative w-full">
-          <input 
-            id="party-input"
-            type="text" 
-            autoComplete="off"
-            value={ledgerName}
-            onKeyDown={(e) => handleKeyDown(e, 'name')}
-            onChange={e => { setLedgerName(e.target.value); setShowSuggestions(true); }}
-            className="w-full border-b-2 border-black py-0.5 text-lg font-black uppercase focus:outline-none bg-transparent text-center" 
-            placeholder="TYPE NAME..."
-          />
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-50 w-full bg-white border-2 border-black mt-1 shadow-2xl">
-              {suggestions.map(s => (
-                <div key={s.id} onClick={() => { setLedgerName(s.name); setShowSuggestions(false); }} className="p-2 border-b last:border-0 font-black uppercase hover:bg-black hover:text-white cursor-pointer text-sm">
-                  {s.name}
-                </div>
-              ))}
-            </div>
-          )}
+      <div className="mb-4 flex flex-col items-center">
+        <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5 mb-1 z-10 block">Client Name</label>
+        <div className="relative w-full flex justify-center mt-[-4px]">
+          <div className="relative w-full md:w-1/2">
+            <input 
+              id="party-input"
+              type="text" 
+              autoComplete="off"
+              value={ledgerName}
+              onFocus={() => { refreshLedgers(); setShowSuggestions(true); }}
+              onKeyDown={(e) => handleKeyDown(e, 'name')}
+              onChange={e => { setLedgerName(e.target.value); setShowSuggestions(true); }}
+              className="w-full border-b-2 border-black py-0.5 text-lg font-black uppercase focus:outline-none bg-transparent text-center" 
+              placeholder="TYPE NAME..."
+            />
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute z-[200] left-1/2 -translate-x-1/2 w-max min-w-[180px] max-w-full bg-indigo-50 border-2 border-black mt-1 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                {suggestions.map(s => (
+                  <div key={s.id} onClick={() => { setLedgerName(s.name); setShowSuggestions(false); }} className="p-3 border-b last:border-0 font-black uppercase hover:bg-black hover:text-white cursor-pointer text-sm truncate">
+                    {s.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="space-y-1">
-        <div className="grid grid-cols-12 gap-1 text-[7px] font-black uppercase text-black border-b border-black pb-0.5">
-          <div className="col-span-3">Particulars</div>
-          <div className="col-span-4 text-center">Qty</div>
-          <div className="col-span-2 text-center">Rate</div>
-          <div className="col-span-2 text-right">Total</div>
-          <div className="col-span-1"></div>
+        <div className={`${GRID_CLASS} text-[7px] font-black uppercase text-black border-b border-black pb-0.5 px-0.5`}>
+          <div>Particulars</div>
+          <div className="text-center ml-12">Qty</div>
+          <div className="text-center">Rate</div>
+          <div className="text-right">Total</div>
+          <div></div>
         </div>
 
         {items.map((item) => (
-          <div key={item.id} className="grid grid-cols-12 gap-1 items-center border-b border-gray-100 pb-1">
-            <div className="col-span-3">
-              <input id={`particulars-${item.id}`} type="text" value={item.particulars} onKeyDown={(e) => handleKeyDown(e, 'particulars', item.id)} onChange={e => handleItemChange(item.id, 'particulars', e.target.value)} className="w-full font-bold uppercase text-[12px] outline-none bg-transparent" placeholder="..." />
+          <div key={item.id} className={`${GRID_CLASS} items-start border-b border-gray-100 py-1.5 px-0.5`}>
+            <div>
+              <textarea 
+                id={`particulars-${item.id}`} 
+                rows={1}
+                value={item.particulars} 
+                onKeyDown={(e) => handleKeyDown(e, 'particulars', item.id)} 
+                onChange={e => handleItemChange(item.id, 'particulars', e.target.value)} 
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = 'auto';
+                  target.style.height = target.scrollHeight + 'px';
+                }}
+                className="w-full font-bold uppercase text-[12px] outline-none bg-transparent resize-none overflow-hidden mt-1" 
+                placeholder="..." 
+              />
             </div>
-            <div className="col-span-4">
-              <input id={`qty-${item.id}`} type="text" inputMode="decimal" value={item.qty} onKeyDown={(e) => handleKeyDown(e, 'qty', item.id)} onChange={e => handleItemChange(item.id, 'qty', e.target.value)} className="w-full font-black text-[13px] text-center bg-transparent border-b border-transparent focus:border-black outline-none" placeholder="0.00" />
+            <div className="pt-1 flex justify-center ml-12">
+              <input 
+                id={`qty-${item.id}`} 
+                type="text" 
+                inputMode="decimal" 
+                value={item.qty} 
+                onKeyDown={(e) => handleKeyDown(e, 'qty', item.id)} 
+                onChange={e => handleItemChange(item.id, 'qty', e.target.value)} 
+                className="w-full font-black text-[13px] text-center bg-white border border-gray-500 px-0.5 rounded outline-none focus:border-indigo-600 transition-colors" 
+                placeholder="0" 
+              />
             </div>
-            <div className="col-span-2">
-              <input id={`rate-${item.id}`} type="text" inputMode="decimal" value={item.rate} onKeyDown={(e) => handleKeyDown(e, 'rate', item.id)} onChange={e => handleItemChange(item.id, 'rate', e.target.value)} className="w-full font-black text-[13px] text-center bg-transparent border-b border-transparent focus:border-black outline-none" />
+            <div className="pt-1 flex justify-center">
+              <input 
+                id={`rate-${item.id}`} 
+                type="text" 
+                inputMode="decimal" 
+                value={item.rate} 
+                onKeyDown={(e) => handleKeyDown(e, 'rate', item.id)} 
+                onChange={e => handleItemChange(item.id, 'rate', e.target.value)} 
+                className="w-full font-black text-[13px] text-center bg-white border border-gray-500 px-0.5 rounded outline-none focus:border-indigo-600 transition-colors" 
+              />
             </div>
-            <div className="col-span-2 text-right font-black text-[13px] truncate">{formatNum(item.amount)}</div>
-            <div className="col-span-1 text-right">
-              <button type="button" onClick={() => removeItem(item.id)} className="text-black hover:text-red-600 p-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            <div className="text-right font-black text-[13px] truncate leading-tight pt-1.5">{formatNum(item.amount)}</div>
+            <div className="flex justify-center pt-1.5">
+              <button 
+                type="button" 
+                onClick={() => removeItem(item.id)} 
+                className="w-5 h-5 flex items-center justify-center border-2 border-black rounded-full text-black hover:bg-red-500 hover:text-white transition-colors"
+                title="Delete Row"
+              >
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="mt-3 flex justify-end">
-        <button type="button" onClick={addItem} className="px-4 py-1.5 border-2 border-dashed border-black font-black uppercase text-[8px] tracking-widest">+ Add Row</button>
+      <div className="mt-2 flex justify-end">
+        <button type="button" onClick={addItem} className="px-3 py-1 border-2 border-dashed border-black font-black uppercase text-[8px] tracking-widest">+ Add Row</button>
       </div>
 
-      <div className="flex justify-between items-end border-t-2 border-black pt-1">
+      <div className="flex justify-between items-end border-t-2 border-black pt-1 mt-1">
         <div className="text-[7px] font-black uppercase text-gray-500 italic">Official</div>
         <div className="text-right">
-          <div className="text-[9px] font-black uppercase opacity-60">Grand Total</div>
-          <div className="text-3xl font-black">₹{formatNum(grandTotal)}</div>
+          <div className="text-[8px] font-black uppercase opacity-60">Grand Total</div>
+          <div className="text-xl font-black">₹{formatNum(grandTotal)} LENA</div>
         </div>
       </div>
 
-      <div className="mt-6">
-        <button type="button" onClick={handleSave} className="w-full bg-indigo-700 text-white py-4 font-black uppercase tracking-widest text-lg shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all">
+      <div className="mt-3">
+        <button type="button" onClick={handleSave} className="w-full bg-indigo-700 text-white py-3 font-black uppercase tracking-widest text-lg shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none transition-all">
           {isEditMode ? 'Update' : 'Save Challan'}
         </button>
       </div>
