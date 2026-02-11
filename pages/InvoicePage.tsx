@@ -215,46 +215,40 @@ const InvoicePage: React.FC = () => {
 
   const formatNum = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-  // GRID OPTIMIZATION (Mobile Focus):
-  // 1. Particulars (1fr) - Flexible, takes most space.
-  // 2. Qty (68px) - Fits 9 characters perfectly.
-  // 3. Rate (56px) - Fits 7 characters perfectly.
-  // 4. Total (80px) - Fits 10 characters perfectly.
-  // 5. Delete (28px) - Constant.
-  const GRID_CLASS = "grid grid-cols-[1fr_68px_56px_80px_28px] gap-x-1.5 items-start";
+  // COLUMN SPECS:
+  // Particulars: Max (1fr)
+  // Qty: 52px (~7 spaces)
+  // Rate: 52px (~7 spaces)
+  // Total: 74px (~9 spaces)
+  // Delete: 24px
+  const GRID_CLASS = "grid grid-cols-[1fr_52px_52px_74px_24px] gap-x-0.5 items-start";
 
   return (
-    <div className="bg-white border-2 border-black p-2 md:p-6 invoice-font w-full mx-auto pb-72 text-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative pt-0 mt-[-2px]">
+    <div className="bg-white border-2 border-black p-1 md:p-6 invoice-font w-full mx-auto pb-72 text-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative pt-0 mt-[-2px] overflow-x-hidden">
+      {/* Header Section */}
       <div className="sticky top-0 bg-white z-[100] border-2 border-black p-2 mb-2 flex justify-between items-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
         <div>
           <h1 className="text-sm font-black uppercase italic text-indigo-700 leading-none tracking-tighter">Challan</h1>
           <input type="date" value={date} onChange={e => setDate(e.target.value)} className="text-[10px] font-bold outline-none mt-1 bg-transparent block" />
         </div>
         <div className="flex items-center gap-1.5">
-          <button type="button" onClick={handleWhatsApp} title="Share via WhatsApp" className="bg-green-600 text-white p-2 rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-            </svg>
+          <button type="button" onClick={handleWhatsApp} className="bg-green-600 text-white p-1.5 rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
           </button>
           <div className="text-right">
             <div className="text-[6px] font-black text-gray-500 uppercase leading-none">Serial</div>
             <div className="flex items-center justify-end">
               <span className="text-xs font-black leading-none mr-0.5">#</span>
-              <input 
-                type="text" 
-                inputMode="numeric"
-                value={serialNo} 
-                onChange={e => setSerialNo(e.target.value)}
-                className="text-xs font-black leading-none w-8 text-right bg-transparent border-b border-dashed border-black focus:border-black outline-none"
-              />
+              <input type="text" inputMode="numeric" value={serialNo} onChange={e => setSerialNo(e.target.value)} className="text-xs font-black leading-none w-8 text-right bg-transparent border-b border-dashed border-black outline-none" />
             </div>
           </div>
-          <button type="button" onClick={handleSave} className="bg-indigo-700 text-white p-2 rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all">
+          <button type="button" onClick={handleSave} className="bg-indigo-700 text-white p-1.5 rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5 transition-all">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"/></svg>
           </button>
         </div>
       </div>
 
+      {/* Client Name Section */}
       <div className="mb-4 flex flex-col items-center">
         <label className="text-[7px] font-black uppercase bg-black text-white px-1.5 py-0.5 mb-1 z-10 block">Client Name</label>
         <div className="relative w-full flex justify-center mt-[-4px]">
@@ -283,9 +277,10 @@ const InvoicePage: React.FC = () => {
         </div>
       </div>
 
+      {/* Items Grid */}
       <div className="space-y-0.5">
         <div className={`${GRID_CLASS} text-[7px] font-black uppercase text-black border-b border-black pb-1 px-1`}>
-          <div>Particulars</div>
+          <div className="pl-1">Particulars</div>
           <div className="text-center">Qty</div>
           <div className="text-center">Rate</div>
           <div className="text-right pr-2">Total</div>
@@ -293,7 +288,7 @@ const InvoicePage: React.FC = () => {
         </div>
 
         {items.map((item) => (
-          <div key={item.id} className={`${GRID_CLASS} border-b border-gray-100 py-1.5 px-1 min-h-[44px]`}>
+          <div key={item.id} className={`${GRID_CLASS} border-b border-gray-100 py-1.5 px-0.5 min-h-[44px]`}>
             <div className="relative pt-0.5">
               <textarea 
                 id={`particulars-${item.id}`} 
@@ -306,7 +301,7 @@ const InvoicePage: React.FC = () => {
                   target.style.height = 'auto';
                   target.style.height = target.scrollHeight + 'px';
                 }}
-                className="w-full font-bold uppercase text-[12px] outline-none bg-transparent resize-none overflow-hidden block min-h-[1.5rem] leading-tight" 
+                className="w-full font-bold uppercase text-[12px] outline-none bg-transparent resize-none overflow-hidden block min-h-[1.5rem] leading-tight pr-1" 
                 placeholder="..." 
               />
             </div>
@@ -318,7 +313,7 @@ const InvoicePage: React.FC = () => {
                 value={item.qty} 
                 onKeyDown={(e) => handleKeyDown(e, 'qty', item.id)} 
                 onChange={e => handleItemChange(item.id, 'qty', e.target.value)} 
-                className="w-full font-black text-[12px] text-center bg-white border border-gray-400 p-1 rounded outline-none focus:border-indigo-600 transition-all" 
+                className="w-full font-black text-[11px] text-center bg-white border border-gray-400 p-1 rounded outline-none focus:border-indigo-600" 
                 placeholder="0" 
               />
             </div>
@@ -330,30 +325,25 @@ const InvoicePage: React.FC = () => {
                 value={item.rate} 
                 onKeyDown={(e) => handleKeyDown(e, 'rate', item.id)} 
                 onChange={e => handleItemChange(item.id, 'rate', e.target.value)} 
-                className="w-full font-black text-[12px] text-center bg-white border border-gray-400 p-1 rounded outline-none focus:border-indigo-600 transition-all" 
+                className="w-full font-black text-[11px] text-center bg-white border border-gray-400 p-1 rounded outline-none focus:border-indigo-600" 
                 placeholder="0"
               />
             </div>
-            <div className="text-right font-black text-[12px] truncate leading-tight pr-2 pt-1.5">{formatNum(item.amount)}</div>
+            <div className="text-right font-black text-[11px] truncate leading-tight pr-2 pt-2">{formatNum(item.amount)}</div>
             <div className="flex justify-center pt-1">
-              <button 
-                type="button" 
-                onClick={() => removeItem(item.id)} 
-                className="w-6 h-6 flex items-center justify-center border border-black rounded-full text-black hover:bg-red-500 hover:text-white transition-colors"
-                title="Delete Row"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
+              <button type="button" onClick={() => removeItem(item.id)} className="w-5 h-5 flex items-center justify-center border border-black rounded-full text-black hover:bg-red-500 hover:text-white transition-colors">
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="mt-3 flex justify-end">
-        <button type="button" onClick={addItem} className="px-3 py-1 border-2 border-dashed border-black font-black uppercase text-[8px] tracking-widest hover:bg-gray-50">+ Add Row</button>
+      <div className="mt-4 flex justify-end pr-2">
+        <button type="button" onClick={addItem} className="px-3 py-1.5 border-2 border-dashed border-black font-black uppercase text-[8px] tracking-widest bg-gray-50 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5">+ Add Row</button>
       </div>
 
-      <div className="flex justify-between items-end border-t-2 border-black pt-2 mt-2">
+      <div className="flex justify-between items-end border-t-2 border-black pt-2 mt-4">
         <div className="text-[7px] font-black uppercase text-gray-400 italic">Accounting System v1.1</div>
         <div className="text-right">
           <div className="text-[8px] font-black uppercase opacity-60">Grand Total</div>
