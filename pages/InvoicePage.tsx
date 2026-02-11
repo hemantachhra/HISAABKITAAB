@@ -215,11 +215,13 @@ const InvoicePage: React.FC = () => {
 
   const formatNum = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-  // GRID OPTIMIZATION: 
-  // Particulars (1fr) takes remaining space.
-  // Qty (85px) fits "1000.000" comfortably.
-  // Rate (80px), Total (90px) kept tight to prevent overflow on mobile.
-  const GRID_CLASS = "grid grid-cols-[1fr_85px_80px_90px_28px] gap-x-1 items-center";
+  // GRID OPTIMIZATION (Mobile Focus):
+  // 1. Particulars (1fr) - Flexible, takes most space.
+  // 2. Qty (68px) - Fits 9 characters perfectly.
+  // 3. Rate (56px) - Fits 7 characters perfectly.
+  // 4. Total (80px) - Fits 10 characters perfectly.
+  // 5. Delete (28px) - Constant.
+  const GRID_CLASS = "grid grid-cols-[1fr_68px_56px_80px_28px] gap-x-1.5 items-start";
 
   return (
     <div className="bg-white border-2 border-black p-2 md:p-6 invoice-font w-full mx-auto pb-72 text-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] relative pt-0 mt-[-2px]">
@@ -281,18 +283,18 @@ const InvoicePage: React.FC = () => {
         </div>
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-0.5">
         <div className={`${GRID_CLASS} text-[7px] font-black uppercase text-black border-b border-black pb-1 px-1`}>
           <div>Particulars</div>
           <div className="text-center">Qty</div>
           <div className="text-center">Rate</div>
-          <div className="text-right">Total</div>
+          <div className="text-right pr-2">Total</div>
           <div></div>
         </div>
 
         {items.map((item) => (
           <div key={item.id} className={`${GRID_CLASS} border-b border-gray-100 py-1.5 px-1 min-h-[44px]`}>
-            <div className="relative">
+            <div className="relative pt-0.5">
               <textarea 
                 id={`particulars-${item.id}`} 
                 rows={1}
@@ -304,11 +306,11 @@ const InvoicePage: React.FC = () => {
                   target.style.height = 'auto';
                   target.style.height = target.scrollHeight + 'px';
                 }}
-                className="w-full font-bold uppercase text-[12px] outline-none bg-transparent resize-none overflow-hidden block min-h-[1.5rem]" 
+                className="w-full font-bold uppercase text-[12px] outline-none bg-transparent resize-none overflow-hidden block min-h-[1.5rem] leading-tight" 
                 placeholder="..." 
               />
             </div>
-            <div className="px-0.5">
+            <div>
               <input 
                 id={`qty-${item.id}`} 
                 type="text" 
@@ -316,11 +318,11 @@ const InvoicePage: React.FC = () => {
                 value={item.qty} 
                 onKeyDown={(e) => handleKeyDown(e, 'qty', item.id)} 
                 onChange={e => handleItemChange(item.id, 'qty', e.target.value)} 
-                className="w-full font-black text-[13px] text-center bg-white border border-gray-400 p-1 rounded outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-200 transition-all" 
+                className="w-full font-black text-[12px] text-center bg-white border border-gray-400 p-1 rounded outline-none focus:border-indigo-600 transition-all" 
                 placeholder="0" 
               />
             </div>
-            <div className="px-0.5">
+            <div>
               <input 
                 id={`rate-${item.id}`} 
                 type="text" 
@@ -328,12 +330,12 @@ const InvoicePage: React.FC = () => {
                 value={item.rate} 
                 onKeyDown={(e) => handleKeyDown(e, 'rate', item.id)} 
                 onChange={e => handleItemChange(item.id, 'rate', e.target.value)} 
-                className="w-full font-black text-[13px] text-center bg-white border border-gray-400 p-1 rounded outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-200 transition-all" 
+                className="w-full font-black text-[12px] text-center bg-white border border-gray-400 p-1 rounded outline-none focus:border-indigo-600 transition-all" 
                 placeholder="0"
               />
             </div>
-            <div className="text-right font-black text-[13px] truncate leading-tight pr-1">{formatNum(item.amount)}</div>
-            <div className="flex justify-center">
+            <div className="text-right font-black text-[12px] truncate leading-tight pr-2 pt-1.5">{formatNum(item.amount)}</div>
+            <div className="flex justify-center pt-1">
               <button 
                 type="button" 
                 onClick={() => removeItem(item.id)} 
